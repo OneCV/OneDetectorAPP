@@ -1,0 +1,3 @@
+F:\MyFile\WorkGroup\IDE\workspace\oneDetector\app\build\intermediates\classes\debug
+F:\MyFile\WorkGroup\IDE\workspace\oneDetector\app\build\intermediates\pre-dexed\debug\classes-7dd4cfba98a9201a8a2d201c28343df43b3ce1c3.jar
+F:\MyFile\WorkGroup\IDE\workspace\oneDetector\app\build\intermediates\pre-dexed\debug\support-v4-19.1.0-bc5a9b96753706e2b1658866dd879cbef0dba9b5.jar
