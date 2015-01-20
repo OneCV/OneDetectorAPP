@@ -59,7 +59,7 @@ public class MenulistActivity extends ActionBarActivity {
     private int numRoi;
     private final int ratio16_9 = 1, ratio4_3 = 2;
 	//ArrayList <roiInfo>
-    private int save_num = 5;   //Todo::  must change with user data
+    private int save_num = 2;   //Todo::  must change with user data
 
     public ServerControl httpControl;
 
