@@ -82,7 +82,7 @@ public class MenulistActivity extends ActionBarActivity {
             previewHeight = metrics.widthPixels;
         }
 		handleButton();
-        httpControl = new ServerControl(null);
+        httpControl = new ServerControl();
 	}
 
 	@Override
@@ -171,7 +171,8 @@ public class MenulistActivity extends ActionBarActivity {
 		super.onActivityResult(requestCode, resultCode, data);
 		if(requestCode == 100 && resultCode == Activity.RESULT_OK){
 			Log.i(tag, "capture picture");
-			
+            Log.i(tag, "imgUri =  " +imgUri);
+            Log.i(tag, "ig " +imgUri.getPath()+" is " + imgUri.toString());
 			//immutable BMP
 			Bitmap bmp = BitmapFactory.decodeFile(imgUri.getPath());			
 			Config config;
@@ -420,7 +421,12 @@ public class MenulistActivity extends ActionBarActivity {
             Log.i(tag, "TAG:" + i + " name:" + tempRoi.roiName + " SX:" + tempRoi.roi.sx);
         }
         post.add(new BasicNameValuePair("NUM", Integer.toString(save_num)));
-        httpControl.httpHandleCmd(httpControl.url_upload, post,httpControl.UPLOAD);
+        httpControl.httpHandleCmd(httpControl.url_upload, post,new ServerDone() {
+            @Override
+            public void execute(String result) {
+                Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
+            }
+        });
         bmp.recycle();
         return true;
     }
