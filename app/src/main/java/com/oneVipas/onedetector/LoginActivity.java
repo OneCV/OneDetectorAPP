@@ -47,7 +47,7 @@ public class LoginActivity extends ActionBarActivity {
 		requestWindowFeature(Window.FEATURE_NO_TITLE);	
 		setContentView(R.layout.activity_login);
 		Log.i(tag, "onCreate");
-		httpControl = new ServerControl(this);
+		httpControl = new ServerControl();
 	}
 
 	@Override
@@ -120,9 +120,24 @@ public class LoginActivity extends ActionBarActivity {
 				post.add(new BasicNameValuePair("USER", editText1.getText().toString()));
 				post.add(new BasicNameValuePair("PASS", editText2.getText().toString()));
                 ServerControl.user = editText1.getText().toString();
-				httpControl.httpHandleCmd(httpControl.url_log_in, post,httpControl.LOG_IN);
-				// new Thread(new
-				// HTTP_Runnable(url_log_in,post,LOG_IN)).start();
+                httpControl.done = new ServerDone() {
+                    @Override
+                    public void execute(String result) {
+                        if(result.equals("login success!"))
+                            change_ui(true);
+                        else
+                            textView1.setText("login failed \n"+result);
+                    }
+                };
+				httpControl.httpHandleCmd(httpControl.url_log_in, post,new ServerDone() {
+                    @Override
+                    public void execute(String result) {
+                        if(result.equals("login success!"))
+                            change_ui(true);
+                        else
+                            textView1.setText("login failed \n"+result);
+                    }
+                });
 			}
 		});
 		
@@ -133,27 +148,32 @@ public class LoginActivity extends ActionBarActivity {
 					View promptsView = li.inflate(R.layout.prompts, null);	 
 					AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(LoginActivity.this);	 
 					alertDialogBuilder.setView(promptsView);	 
-					final EditText userInput = (EditText)promptsView.findViewById(R.id.editTextDialogUserInput);	 
+					final EditText userInput = (EditText)promptsView.findViewById(R.id.editTextDialogUserInput);
 					alertDialogBuilder.setCancelable(false)
 						.setPositiveButton("OK",new DialogInterface.OnClickListener() {
 						    public void onClick(DialogInterface dialog,int id) {
 					    		textView1.setText("loading...");
-								
+
 								List<NameValuePair> post = new ArrayList<NameValuePair>();
 								post.add(new BasicNameValuePair("USER",editText1.getText().toString()));
 								post.add(new BasicNameValuePair("PASS",editText2.getText().toString()));
 								post.add(new BasicNameValuePair("MAIL",userInput.getText().toString()));
                                 ServerControl.user = editText1.getText().toString();
-								httpControl.httpHandleCmd(httpControl.url_sign_up, post, httpControl.REFRESH_DATA);
-								//new Thread(new HTTP_Runnable(url_sign_up,post,REFRESH_DATA)).start();
+
+								httpControl.httpHandleCmd(httpControl.url_sign_up, post, new ServerDone() {
+                                    @Override
+                                    public void execute(String result) {
+                                        textView1.setText(result);
+                                    }
+                                });
 						    }
 						  })
-						.setNegativeButton("Cancel",new DialogInterface.OnClickListener() {
-						    public void onClick(DialogInterface dialog,int id) {
-						    	dialog.cancel();
-						    }
-						  });
-	 
+						.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int id) {
+                                dialog.cancel();
+                            }
+                        });
+
 					AlertDialog alertDialog = alertDialogBuilder.create();
 					alertDialog.show();	 
 				}
@@ -181,8 +201,19 @@ public class LoginActivity extends ActionBarActivity {
 				 * e.printStackTrace(); }
 				 */
 				httpControl.httpHandleCmd(httpControl.url_file, null,
-						httpControl.FILE);
-				// new Thread(new HTTP_Runnable(url_file,null,FILE)).start();
+						 new ServerDone() {
+                            @Override
+                            public void execute(String result) {
+                                String str = "";
+                                try {
+                                    str = new String(Base64.decode(result));
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                                Toast.makeText(getBaseContext(), str, Toast.LENGTH_LONG).show();
+                            }
+                        });
+
 			}
 		});
 		button5.setOnClickListener(new OnClickListener() {
@@ -205,7 +236,13 @@ public class LoginActivity extends ActionBarActivity {
 				List<NameValuePair> post = new ArrayList<NameValuePair>();
 				post.add(new BasicNameValuePair("FILE", new String(data)));
 				httpControl.httpHandleCmd(httpControl.url_upload, null,
-						httpControl.UPLOAD);
+						new ServerDone() {
+                            @Override
+                            public void execute(String result) {
+                                textView1.setText(result);
+                                Toast.makeText(getBaseContext(),result,Toast.LENGTH_LONG).show();
+                            }
+                        });
 				// new Thread(new
 				// HTTP_Runnable(url_upload,post,UPLOAD)).start();
 			}
