@@ -10,6 +10,7 @@ import java.util.List;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuff.Mode;
 import android.graphics.Bitmap;
@@ -65,6 +66,7 @@ public class MenulistActivity extends ActionBarActivity {
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
+        Log.i(tag,"MenulistActivity onCreate");
 		super.onCreate(savedInstanceState);
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
@@ -84,7 +86,16 @@ public class MenulistActivity extends ActionBarActivity {
 		handleButton();
         httpControl = new ServerControl();
 	}
-
+    @Override
+    public void onConfigurationChanged(Configuration newConfig){
+        super.onConfigurationChanged(newConfig);
+        Log.i(tag,"MenulistActivity onConfigurationChanged");
+        // Checks the orientation of the screen
+        if(newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE)
+            Log.i(tag,"Landscape");
+        else if(newConfig.orientation == Configuration.ORIENTATION_PORTRAIT)
+            Log.i(tag,"portrait");
+    }
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		// Inflate the menu; this adds items to the action bar if it is present.
@@ -131,7 +142,6 @@ public class MenulistActivity extends ActionBarActivity {
 				goCamera();				
 			}
 		});
-		
 	}
 	
 	private void goExistingRecord(){
