@@ -23,7 +23,6 @@
             android:label="@string/app_name" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
@@ -36,12 +35,9 @@
             android:label="@string/title_activity_camera_preview" >
         </activity>
         <activity
-            android:name=".MenuList"
-            android:label="@string/title_activity_menu_list" >
-        </activity>
-        <activity
             android:name=".MenulistActivity"
-            android:label="@string/title_activity_menulist" >
+            android:label="@string/title_activity_menulist"
+            android:configChanges="orientation|keyboardHidden|screenSize" >
         </activity>
         <activity
             android:name=".ExistingRecordActivity"
