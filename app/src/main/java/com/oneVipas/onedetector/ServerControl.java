@@ -29,23 +29,21 @@ public class ServerControl {
 	public final int REFRESH_DATA = 0x00000002,LOG_IN = 0x00000001,FILE = 0x00000003,UPLOAD = 0x00000004;
 	public LoginActivity loginActivity;
 	public static String user;
-	public ServerControl(LoginActivity loginClass) {
-		loginActivity = loginClass;
-	}
-	
-	public void httpHandleCmd(String url, List<NameValuePair> post, int msg){	
-		new Thread(new HTTP_Runnable(url,post,msg)).start();	
+    public ServerDone done = null;
+
+	public void httpHandleCmd(String url, List<NameValuePair> post, ServerDone param_done){
+        done = param_done;
+		new Thread(new HTTP_Runnable(url,post)).start();
 	}
 	
 	class HTTP_Runnable implements Runnable{
     	String URL;
     	List<NameValuePair> POST;
     	int MSG;
-    	HTTP_Runnable(String url,List<NameValuePair> post,int msg)
+    	HTTP_Runnable(String url,List<NameValuePair> post)
     	{
     		URL = url;
     		POST = post;
-    		MSG = msg;
     	}
         @Override
         public void run() {
@@ -66,10 +64,10 @@ public class ServerControl {
     			}
     		} catch (Exception e)
     		{
-    			//Toast.makeText(getBaseContext(), e.toString(), Toast.LENGTH_LONG).show();
     			e.printStackTrace();
     			result = null;
     		}
+
     		mHandler.obtainMessage(MSG,result).sendToTarget();
         }
     }
@@ -83,28 +81,35 @@ public class ServerControl {
 		{
 			byte[] result = null;
 			String str;
-			
-			//loginActivity.setText("");
+
 			if(msg.obj instanceof byte[])
 				result = (byte[]) msg.obj;
-			//Log.i("USB",str);
+
+
+            if(result!=null && done!=null)
+                done.execute(new String(result));
+
 			if(result!=null)
 			{
+
 				switch(msg.what)
 				{
 					case LOG_IN:
+                        /*
 						str = new String(result);
 						if(str.equals("login success!"))
 							loginActivity.change_ui(true);
 						else
 							loginActivity.setText("login failed \n"+str);
+							*/
 						break;
 					case REFRESH_DATA:
-						str = new String(result);
-						loginActivity.setText(str);
+						//str = new String(result);
+						//loginActivity.setText(str);
 						//Toast.makeText(MainActivity.this,result,Toast.LENGTH_LONG).show();
 						break;
 					case FILE:
+                        /*
                         str = "";
                         try {
                             str = new String(Base64.decode(result));
@@ -112,6 +117,7 @@ public class ServerControl {
                             e.printStackTrace();
                         }
                         Toast.makeText(loginActivity.getParent(), str, Toast.LENGTH_LONG).show();
+                        */
 						/*
 						 try{
 
@@ -140,11 +146,13 @@ public class ServerControl {
 						 */
 						 break;
                     case UPLOAD:
+                        /*
                         str = new String(result);
                         //loginActivity.setText(str);
                         //Toast.makeText(loginActivity.getParent(),str,Toast.LENGTH_LONG).show();
                         //Toast.makeText(application,str,Toast.LENGTH_LONG).show();
                         Log.i(tag,str);
+                        */
                         break;
 				}
 			}
