@@ -1,9 +1,0 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/FrameLayout1"
-    android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    tools:context="com.oneVipas.onedetector.CameraPreviewActivity" >
-
-</FrameLayout>
-<!-- From: file:/F:/MyFile/WorkGroup/IDE/workspace/oneDetector/app/src/main/res/layout/activity_camera_preview.xml -->

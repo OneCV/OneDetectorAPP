@@ -1,3 +1,0 @@
-D:\Android\Android studioProjects\OneDetectorAPP\app\build\intermediates\classes\debug
-D:\Android\Android studioProjects\OneDetectorAPP\app\build\intermediates\pre-dexed\debug\classes-3ef0d3ce63e8d44a23423d110efa403fc1f30909.jar
-D:\Android\Android studioProjects\OneDetectorAPP\app\build\intermediates\pre-dexed\debug\support-v4-19.1.0-73b9883bfda7e9a6ae205d0e99c174e73ba72aaa.jar
