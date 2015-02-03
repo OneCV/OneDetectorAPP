@@ -1,14 +1,15 @@
 package com.oneVipas.onedetector;
 
-import java.io.IOException;
-
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
 import android.graphics.Paint;
 import android.graphics.PorterDuff.Mode;
 import android.graphics.PorterDuffXfermode;
+import android.graphics.Rect;
+import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
 import android.os.Handler;
@@ -17,21 +18,27 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.widget.ImageView;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
 public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCallback{
 
 	private int gPreviewWidth, gPreviewHeight;
 	private ImageView gCamPreview = null;
 	private int imageFormat;
-	private final String tag = "oneDetector";
+	private final String tag = "CameraPreviewClass";
 	private boolean bProcessing = false;
 	private byte[] frameData = null;
 	private int[] outData = null;
 	private Bitmap bitmap = null;
 	private SurfaceHolder gDrawHolder;
+    private int taskStatus;
 	Handler mHandler = new Handler(Looper.getMainLooper());
 	public native boolean cvObjectDetectionInit();
 	public rectObject rectClass = new rectObject();
 	public Camera mCamera = null;
+    public final int TRAINING_TASK = 1;
+    public final int CVPROCESS_TASK = 2;
 	
 	public class rectObject{
 		public int x;
@@ -79,6 +86,7 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 		Parameters params;
 		params = mCamera.getParameters();
 		imageFormat = params.getPreviewFormat();
+        params.setFocusMode(Parameters.FOCUS_MODE_AUTO);
 		params.setPreviewSize(gPreviewWidth, gPreviewHeight);
 		try	{
 			mCamera.setParameters(params);
@@ -92,11 +100,15 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 
 	@Override
 	public void surfaceDestroyed(SurfaceHolder holder) {
-		mCamera.setPreviewCallback(null);
-		mCamera.stopPreview();
-		mCamera.release();
-		mCamera = null;
-	}
+	    try {
+            mCamera.stopPreview();
+            mCamera.setPreviewCallback(null);
+            mCamera.release();
+            mCamera = null;
+        }catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
 	protected void onPause() {
 		if(mCamera!=null)
@@ -120,18 +132,45 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 
 	@Override
 	public void onPreviewFrame(byte[] data, Camera camera) {
-		// preview call back for camera set callback, endless loop for catch image.
-		if (imageFormat == ImageFormat.NV21)// camera preview format.
-		{
-			if (!bProcessing)
-			{
-				frameData = data;
-				mHandler.post(cvProcess);
-			}
-		}
-	}
-	
-	
+        // preview call back for camera set callback, endless loop for catch image.
+        if (imageFormat == ImageFormat.NV21)// camera preview format.
+        {
+            if (!bProcessing) {
+                frameData = data;
+
+                if(taskStatus == CVPROCESS_TASK)
+                    mHandler.post(cvProcess);
+            }
+        }
+    }
+
+    public void autofocus(){
+        mCamera.autoFocus(null);
+    }
+
+    public void sendStatus(int status){
+        taskStatus = status;
+    }
+
+    public Bitmap captureImage(){
+        if(taskStatus == TRAINING_TASK){
+            Log.i(tag, "capture the image and save with show on image view");
+            bProcessing = true;
+            YuvImage yuvimage = new YuvImage(frameData, ImageFormat.NV21, gPreviewWidth, gPreviewHeight, null);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            yuvimage.compressToJpeg(new Rect(0, 0, gPreviewWidth, gPreviewHeight), 80, baos);
+            byte[] jdata = baos.toByteArray();
+            BitmapFactory.Options bitmapFatoryOptions = new BitmapFactory.Options();
+            bitmapFatoryOptions.inPreferredConfig = Bitmap.Config.RGB_565;
+            Bitmap bmp = BitmapFactory.decodeByteArray(jdata, 0, jdata.length, bitmapFatoryOptions);
+            bProcessing = false;
+            return bmp;
+        }else{
+            Log.i(tag, "status error");
+        }
+        return null;
+    }
+
 	// load JNI
 	// declare JNI api
 	public native boolean cvipProcessing(int width, int height, byte[] srcData, int[] outData, rectObject rectClass);
@@ -164,6 +203,7 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 				paint.setXfermode(new PorterDuffXfermode(Mode.CLEAR));
 				canvas.drawPaint(paint);
 				paint.setXfermode(new PorterDuffXfermode(Mode.SRC));
+
 		        paint.setColor(Color.RED);
 		        paint.setStrokeWidth(2);
 		        paint.setStyle(Paint.Style.STROKE);
