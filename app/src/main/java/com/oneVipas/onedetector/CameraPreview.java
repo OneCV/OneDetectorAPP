@@ -23,7 +23,7 @@ import java.io.IOException;
 
 public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCallback{
 
-	private int gPreviewWidth, gPreviewHeight;
+	private int gPreviewWidth, gPreviewHeight, gscreenWidth, gscreenHeight;
 	private ImageView gCamPreview = null;
 	private int imageFormat;
 	private final String tag = "CameraPreviewClass";
@@ -47,10 +47,12 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 		public int height;
 	}
 	
-	public CameraPreview(int previewWidth, int previewHeight, SurfaceHolder drawHolder)
+	public CameraPreview(int previewWidth, int previewHeight, int screenWidth, int screenHeight, SurfaceHolder drawHolder)
 	{
 		gPreviewWidth = previewWidth;
 		gPreviewHeight = previewHeight;
+        gscreenWidth = screenWidth;
+        gscreenHeight = screenHeight;
 		gDrawHolder = drawHolder;
 		//bitmap = camPreview.getDrawingCache();
 		//bitmap = Bitmap.createBitmap(gPreviewWidth, gPreviewHeight, Bitmap.Config.ARGB_8888);
@@ -145,7 +147,12 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
     }
 
     public void autofocus(){
-        mCamera.autoFocus(null);
+        try {
+            mCamera.autoFocus(null);
+        }
+        catch (Exception err) {
+            Log.d(tag, err.toString());
+        }
     }
 
     public void sendStatus(int status){
@@ -207,12 +214,18 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 		        paint.setColor(Color.RED);
 		        paint.setStrokeWidth(2);
 		        paint.setStyle(Paint.Style.STROKE);
+                //Log.i(tag, "Runnable gPreviewSize = " + gPreviewWidth + " * " + gPreviewHeight);
+                double scalex = gscreenWidth/(double)gPreviewWidth;
+                double scaley = gscreenHeight/(double)gPreviewHeight;
+                rectClass.x = (int)(rectClass.x*scalex);
+                rectClass.y = (int)(rectClass.y*scaley);
+                rectClass.width = (int)(rectClass.width*scalex);
+                rectClass.height = (int)(rectClass.height*scaley);
 		        canvas.drawRect(rectClass.x, rectClass.y, (rectClass.x+rectClass.width)-1, (rectClass.y+rectClass.height)-1, paint);
 		       
 			}catch (Exception e) {  
                 e.printStackTrace(); 
 			}finally{
-			//Log.i(tag, String.format("ssssssss"));
 				if (canvas != null)
 					gDrawHolder.unlockCanvasAndPost(canvas); 
 			}

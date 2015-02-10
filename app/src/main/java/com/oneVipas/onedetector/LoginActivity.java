@@ -143,9 +143,9 @@ public class LoginActivity extends ActionBarActivity {
 		
 		 button2.setOnClickListener(new OnClickListener(){
 				@Override
-				public void onClick(View arg0) {// get prompts.xml view
+				public void onClick(View arg0) {// get activity_prompts.xmlompts.xml view
 					LayoutInflater li = LayoutInflater.from(getBaseContext());
-					View promptsView = li.inflate(R.layout.prompts, null);	 
+					View promptsView = li.inflate(R.layout.activity_prompts, null);
 					AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(LoginActivity.this);	 
 					alertDialogBuilder.setView(promptsView);	 
 					final EditText userInput = (EditText)promptsView.findViewById(R.id.editTextDialogUserInput);
