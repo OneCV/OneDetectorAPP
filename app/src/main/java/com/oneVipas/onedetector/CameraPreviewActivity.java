@@ -25,6 +25,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -50,6 +51,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
     private Button captureButton, doneButton;
     private Button okButton, resetButton;
     private TextView debugText;
+    private ProgressBar progressBar;
     private int status = 0, settingStatus = 0;
     private final int GET_TRAINING = 1;
     private projectPt startPt, endPt;
@@ -116,6 +118,8 @@ public class CameraPreviewActivity extends ActionBarActivity {
         resetButton = (Button)findViewById(R.id.button2);
         doneButton = (Button)findViewById(R.id.button3);
         debugText = (TextView)findViewById(R.id.textView1);
+        progressBar = (ProgressBar)findViewById(R.id.progressBar);
+        frameLayout.removeView(progressBar);
         httpControl = new ServerControl();
 		it = getIntent();
 		recordStatus = it.getStringExtra("record");
@@ -563,6 +567,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
     {
         int numRoi;
         drawHistory tempRoi;
+        frameLayout.addView(progressBar);
         // upload picture
         Log.i(tag,"upload picture and training data!");
         if(originBitmap == null)
@@ -600,6 +605,9 @@ public class CameraPreviewActivity extends ActionBarActivity {
             @Override
             public void execute(String result) {
                 Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
+                frameLayout.removeView(progressBar);
+                finish();
+
             }
         });
         if(originBitmap != null) {
