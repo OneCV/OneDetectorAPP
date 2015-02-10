@@ -147,7 +147,12 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
     }
 
     public void autofocus(){
-        mCamera.autoFocus(null);
+        try {
+            mCamera.autoFocus(null);
+        }
+        catch (Exception err) {
+            Log.d(tag, err.toString());
+        }
     }
 
     public void sendStatus(int status){
