@@ -116,26 +116,20 @@ public class LoginActivity extends ActionBarActivity {
 			@Override
 			public void onClick(View arg0) {
 				textView1.setText("loading...");
-				List<NameValuePair> post = new ArrayList<NameValuePair>();
-				post.add(new BasicNameValuePair("USER", editText1.getText().toString()));
-				post.add(new BasicNameValuePair("PASS", editText2.getText().toString()));
                 ServerControl.user = editText1.getText().toString();
-                httpControl.done = new ServerDone() {
-                    @Override
-                    public void execute(String result) {
-                        if(result.equals("login success!"))
-                            change_ui(true);
-                        else
-                            textView1.setText("login failed \n"+result);
-                    }
-                };
+                ServerControl.pass = editText2.getText().toString();
+				List<NameValuePair> post = new ArrayList<NameValuePair>();
 				httpControl.httpHandleCmd(httpControl.url_log_in, post,new ServerDone() {
                     @Override
-                    public void execute(String result) {
-                        if(result.equals("login success!"))
+                    public void execute(byte[] result) {
+                        String str = new String(result);
+                        if(str.substring(1).equals("login success!")) {
+                            httpControl.saves = Integer.parseInt(str.charAt(0) + "");
+                            Log.i(tag, "saves = " + httpControl.saves);
                             change_ui(true);
+                        }
                         else
-                            textView1.setText("login failed \n"+result);
+                            textView1.setText("login failed \n"+str);
                     }
                 });
 			}
@@ -154,16 +148,15 @@ public class LoginActivity extends ActionBarActivity {
 						    public void onClick(DialogInterface dialog,int id) {
 					    		textView1.setText("loading...");
 
-								List<NameValuePair> post = new ArrayList<NameValuePair>();
-								post.add(new BasicNameValuePair("USER",editText1.getText().toString()));
-								post.add(new BasicNameValuePair("PASS",editText2.getText().toString()));
-								post.add(new BasicNameValuePair("MAIL",userInput.getText().toString()));
                                 ServerControl.user = editText1.getText().toString();
+                                ServerControl.pass = editText2.getText().toString();
+								List<NameValuePair> post = new ArrayList<NameValuePair>();
+								post.add(new BasicNameValuePair("MAIL",userInput.getText().toString()));
 
 								httpControl.httpHandleCmd(httpControl.url_sign_up, post, new ServerDone() {
                                     @Override
-                                    public void execute(String result) {
-                                        textView1.setText(result);
+                                    public void execute(byte[] result) {
+                                        textView1.setText(new String(result));
                                     }
                                 });
 						    }
@@ -197,16 +190,16 @@ public class LoginActivity extends ActionBarActivity {
 				 * try { fullFilename.createNewFile();
 				 * fullFilename.setWritable(Boolean.TRUE);
 				 * //songtaste.stDownloadFromUrl(strSongUrl, fullFilename); }
-				 * catch (IOException e) { // TODO Auto-generated catch block
+				 * catch (IOException e) {
 				 * e.printStackTrace(); }
 				 */
-				httpControl.httpHandleCmd(httpControl.url_file, null,
+				httpControl.httpHandleCmd(httpControl.url_download, null,
 						 new ServerDone() {
                             @Override
-                            public void execute(String result) {
+                            public void execute(byte[] result) {
                                 String str = "";
                                 try {
-                                    str = new String(Base64.decode(result));
+                                    str = new String(Base64.decode(new String(result)));
                                 } catch (IOException e) {
                                     e.printStackTrace();
                                 }
@@ -238,9 +231,9 @@ public class LoginActivity extends ActionBarActivity {
 				httpControl.httpHandleCmd(httpControl.url_upload, null,
 						new ServerDone() {
                             @Override
-                            public void execute(String result) {
-                                textView1.setText(result);
-                                Toast.makeText(getBaseContext(),result,Toast.LENGTH_LONG).show();
+                            public void execute(byte[] result) {
+                                textView1.setText(new String(result));
+                                Toast.makeText(getBaseContext(),new String(result),Toast.LENGTH_LONG).show();
                             }
                         });
 				// new Thread(new
@@ -254,10 +247,6 @@ public class LoginActivity extends ActionBarActivity {
 	public void onPause() {
 		super.onPause();
 		Log.i(tag, "onPause");
-		//if(LOGGED)
-		//{
-		//	camView.setVisibility(View.INVISIBLE);
-		//}
 	}
 	
 	@Override
