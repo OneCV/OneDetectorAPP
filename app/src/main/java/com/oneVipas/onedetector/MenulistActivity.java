@@ -28,11 +28,16 @@ public class MenulistActivity extends ActionBarActivity {
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		setContentView(R.layout.activity_menulist);
-        DisplayMetrics metrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        //DisplayMetrics metrics = new DisplayMetrics();
+        //getWindowManager().getDefaultDisplay().getMetrics(metrics);
 
 		handleButton();
 	}
+    @Override
+    protected void onResume() {
+        super.onResume();
+        handleButton();
+    }
     @Override
     public void onConfigurationChanged(Configuration newConfig){
         super.onConfigurationChanged(newConfig);
@@ -81,6 +86,10 @@ public class MenulistActivity extends ActionBarActivity {
 				goCamera();				
 			}
 		});
+        if(ServerControl.saves==0)
+            oldButton.setVisibility(View.INVISIBLE);
+        else
+            oldButton.setVisibility(View.VISIBLE);
 	}
 	
 	private void goExistingRecord(){
@@ -101,11 +110,6 @@ public class MenulistActivity extends ActionBarActivity {
 		super.onPause();
 
 	}
-	
-	@Override
-	public void onResume() {
-		super.onResume();
 
-	}
 	
 }
