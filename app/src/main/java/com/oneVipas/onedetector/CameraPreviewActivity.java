@@ -164,6 +164,10 @@ public class CameraPreviewActivity extends ActionBarActivity {
         mCamera.release();
         if(i==-1)
             Log.e("CV", "CameraPreviewSizes do not support");
+
+        previewWidth = screenWidth;
+        previewHeight = screenHeight;
+
         it = getIntent();
 		recordStatus = it.getStringExtra("record");
         if(recordStatus != null){
