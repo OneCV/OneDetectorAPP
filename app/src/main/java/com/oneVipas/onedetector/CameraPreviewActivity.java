@@ -1,19 +1,25 @@
 package com.oneVipas.onedetector;
 
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.Point;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
+import android.hardware.Camera;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
@@ -24,7 +30,9 @@ import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -41,6 +49,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
 	private String tag = "CameraPreviewActivity";
 	private int dpi;
 	private int previewWidth, previewHeight;
+    private int screenWidth, screenHeight;
 	private CameraPreview camPreview = null;
 	private SurfaceView camView = null, bitmapView = null, drawView = null, bufferView = null;
 	private SurfaceHolder camHolder = null, bitmapHolder = null, bufferHolder = null, drawHolder = null;
@@ -50,14 +59,16 @@ public class CameraPreviewActivity extends ActionBarActivity {
     private Button captureButton, doneButton;
     private Button okButton, resetButton;
     private TextView debugText;
+    private ProgressBar progressBar;
     private int status = 0, settingStatus = 0;
     private final int GET_TRAINING = 1;
     private projectPt startPt, endPt;
-    private Bitmap originBitmap;
+    private Bitmap resizeBitmap;
     private LinkedList <drawHistory> drawList;
     private settingStep setStep = new settingStep();
     private ServerControl httpControl;
-    private int save_num = 0;   //Todo::  must change with user data
+    private int save_num;
+    private Bitmap originBitmap;
 
     class projectPt {
         int x;
@@ -116,48 +127,105 @@ public class CameraPreviewActivity extends ActionBarActivity {
         resetButton = (Button)findViewById(R.id.button2);
         doneButton = (Button)findViewById(R.id.button3);
         debugText = (TextView)findViewById(R.id.textView1);
+        progressBar = (ProgressBar)findViewById(R.id.progressBar);
+        frameLayout.removeView(progressBar);
         httpControl = new ServerControl();
-		it = getIntent();
+
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+
+
+        dpi = metrics.densityDpi;
+        if (metrics.widthPixels > metrics.heightPixels) {
+            screenWidth = metrics.widthPixels;
+            screenHeight = metrics.heightPixels;
+        } else {
+            screenWidth = metrics.heightPixels;
+            screenHeight = metrics.widthPixels;
+        }
+        Log.i(tag, "Screen dpi = " + dpi + " , w = " + screenWidth+ " , h = " + screenHeight);
+
+        Camera.Parameters params;
+        Camera mCamera = Camera.open();
+        params = mCamera.getParameters();
+        List<Camera.Size> previewSizes = params.getSupportedPreviewSizes();
+        int length = previewSizes.size();
+        int i;
+        for (i = length-1; i >= 0; i--) {
+            Log.d("CV","SupportedPreviewSizes : " + previewSizes.get(i).width + "x" + previewSizes.get(i).height);
+            if(previewSizes.get(i).height>640 && previewSizes.get(i).width>480)
+            {
+                previewWidth = previewSizes.get(i).width;
+                previewHeight = previewSizes.get(i).height;
+                Log.i("CV", "CameraPreviewSizes = " + previewWidth + "x" + previewHeight);
+                break;
+            }
+        }
+        mCamera.release();
+        if(i==-1)
+            Log.e("CV", "CameraPreviewSizes do not support");
+
+        previewWidth = screenWidth;
+        previewHeight = screenHeight;
+
+        it = getIntent();
 		recordStatus = it.getStringExtra("record");
         if(recordStatus != null){
 		    if (recordStatus.equals("pass")){
 			    Log.d(tag, "camera activity!");
 			    enableCameraPreview();
-		    }else{
-			    Log.e(tag, "unexception login status");
 		    }
+            else
+			    Log.e(tag, "unexception login status");
+
         }
         serviceStatus = it.getStringExtra("newTraining");
         if (serviceStatus != null) {
             if (serviceStatus.equals("goCamera")) {
                 Log.d(tag, "camera  training activity!");
                 enableTrainingSetting();
-            } else {
-                Log.e(tag, "unexception login status");
             }
+            else
+                Log.e(tag, "unexception login status");
         }
-
         handleButton();
-
 
 	}
 
     public void enableTrainingSetting(){
-
-        //Initial setting
-
-        DisplayMetrics metrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        dpi = metrics.densityDpi;
-        if (metrics.widthPixels > metrics.heightPixels) {
-            previewWidth = metrics.widthPixels;
-            previewHeight = metrics.heightPixels;
-        } else {
-            previewWidth = metrics.heightPixels;
-            previewHeight = metrics.widthPixels;
+        // setting save_num
+        if(httpControl.saves<3)
+            save_num = httpControl.saves+1;
+        else
+        {
+            LayoutInflater li = LayoutInflater.from(getBaseContext());
+            View promptsView = li.inflate(R.layout.activity_prompts2, null);
+            AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(CameraPreviewActivity.this);
+            alertDialogBuilder.setView(promptsView);
+            final EditText userInput = (EditText)promptsView.findViewById(R.id.editTextDialogUserInput);
+            alertDialogBuilder.setCancelable(false)
+                    .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int id) {
+                            int idx = Integer.parseInt(userInput.getText().toString());
+                            if (idx >= 1 && idx <= 3)
+                                save_num = idx;
+                            else
+                            {
+                                Toast.makeText(getBaseContext(), "Must between 1~3", Toast.LENGTH_LONG).show();
+                                finish();
+                            }
+                        }
+                    })
+                    .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int id) {
+                            dialog.cancel();
+                            finish();
+                        }
+                    });
+            AlertDialog alertDialog = alertDialogBuilder.create();
+            alertDialog.show();
         }
-        Log.i(tag, "dpi = " + dpi + " , w = " + previewWidth+ " , h = " + previewHeight);
-
+        //Initial setting
         camView = new SurfaceView(this);
         camHolder = camView.getHolder();
         drawView = new SurfaceView(this);
@@ -167,7 +235,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
         bufferView = new SurfaceView(this);
         bufferHolder = bufferView.getHolder();
 
-        camPreview = new CameraPreview(previewWidth, previewHeight, drawHolder);
+        camPreview = new CameraPreview(previewWidth, previewHeight, screenWidth, screenHeight, drawHolder);
         camPreview.sendStatus(camPreview.TRAINING_TASK);
         camHolder.addCallback(camPreview);
         camHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
@@ -178,10 +246,10 @@ public class CameraPreviewActivity extends ActionBarActivity {
         drawView.setZOrderOnTop(true);
         drawHolder.setFormat(PixelFormat.TRANSPARENT);
 
-        frameLayout.addView(camView, new LayoutParams(previewWidth,previewHeight));
-        frameLayout.addView(bitmapView, new LayoutParams(previewWidth,previewHeight));
-        frameLayout.addView(bufferView, new LayoutParams(previewWidth, previewHeight));
-        frameLayout.addView(drawView, new LayoutParams(previewWidth,previewHeight));  // previewWidth,previewHeight
+        frameLayout.addView(camView, new LayoutParams(screenWidth,screenHeight));
+        frameLayout.addView(bitmapView, new LayoutParams(screenWidth,screenHeight));
+        frameLayout.addView(bufferView, new LayoutParams(screenWidth, screenHeight));
+        frameLayout.addView(drawView, new LayoutParams(screenWidth,screenHeight));  // previewWidth,previewHeight
 
         frameLayout.removeView(captureButton);
         frameLayout.addView(captureButton);
@@ -196,24 +264,12 @@ public class CameraPreviewActivity extends ActionBarActivity {
     }
 
 	public void enableCameraPreview(){
-		DisplayMetrics metrics = new DisplayMetrics();
-		getWindowManager().getDefaultDisplay().getMetrics(metrics);
-		dpi = metrics.densityDpi;
-		if (metrics.widthPixels > metrics.heightPixels) {
-			previewWidth = metrics.widthPixels;
-			previewHeight = metrics.heightPixels;
-		} else {
-			previewWidth = metrics.heightPixels;
-			previewHeight = metrics.widthPixels;
-		}
-		Log.i(tag, "dpi = " + dpi + " , w = " + previewWidth+ " , h = " + previewHeight);
-
         camView = new SurfaceView(this);
 		camHolder = camView.getHolder();
 		drawView = new SurfaceView(this);
 		drawHolder = drawView.getHolder();
 
-		camPreview = new CameraPreview(previewWidth, previewHeight, drawHolder);
+		camPreview = new CameraPreview(previewWidth, previewHeight, screenWidth, screenHeight, drawHolder);
         camPreview.sendStatus(camPreview.CVPROCESS_TASK);
 		camHolder.addCallback(camPreview);
 		camHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
@@ -222,8 +278,8 @@ public class CameraPreviewActivity extends ActionBarActivity {
 		frameLayout = (FrameLayout) findViewById(R.id.FrameLayout1);
 		//frameLayout.addView(camView, new LayoutParams(1196,720));
 		//frameLayout.addView(drawView, new LayoutParams(1196,720));  // previewWidth,previewHeight
-        frameLayout.addView(camView, new LayoutParams(previewWidth,previewHeight));
-        frameLayout.addView(drawView, new LayoutParams(previewWidth,previewHeight));  // previewWidth,previewHeight
+        frameLayout.addView(camView, new LayoutParams(screenWidth,screenHeight));
+        frameLayout.addView(drawView, new LayoutParams(screenWidth,screenHeight));  // previewWidth,previewHeight
 
 	}
 
@@ -268,16 +324,27 @@ public class CameraPreviewActivity extends ActionBarActivity {
 		*/
 	}
 
-    private projectPt projectXY(SurfaceView sv, Bitmap bp, int x, int y) {
-        if (x < 0 || y < 0 || x > sv.getWidth() || y > sv.getHeight()) {
+    private projectPt projectXY(int fromWidth,int fromHeight, int toWidth, int toHeight, int x, int y) {
+
+        if (x < 0 || y < 0 || x > fromWidth || y > fromHeight) {
             // outside ImageView
             return null;
         } else {
-            int projectedX = (int)((double)x * ((double)bp.getWidth()/(double)sv.getWidth()));
-            int projectedY = (int)((double)y * ((double)bp.getHeight()/(double)sv.getHeight()));
+            int projectedX = (int)((double)x * ((double)toWidth/(double)fromWidth));
+            int projectedY = (int)((double)y * ((double)toHeight/(double)fromHeight));
 
             return new projectPt(projectedX, projectedY);
         }
+    }
+
+    private projectPt projectXY(SurfaceView sv, Bitmap bp, int x, int y) {
+        return projectXY(sv.getWidth(),sv.getHeight(),bp.getWidth(),bp.getHeight(),x,y);
+    }
+
+    private drawHistory projectROI(Bitmap resizeBitmap, Bitmap originBitmap, drawHistory tempRoi) {
+        tempRoi.start = projectXY(resizeBitmap.getWidth(),resizeBitmap.getHeight(),originBitmap.getWidth(),originBitmap.getHeight(),tempRoi.start.x,tempRoi.start.y);
+        tempRoi.end = projectXY(resizeBitmap.getWidth(),resizeBitmap.getHeight(),originBitmap.getWidth(),originBitmap.getHeight(),tempRoi.end.x,tempRoi.end.y);
+        return tempRoi;
     }
 
     private void drawSettingList(LinkedList <drawHistory> list, Canvas canvas, Paint paint){
@@ -290,13 +357,13 @@ public class CameraPreviewActivity extends ActionBarActivity {
             for(int i=0; i<size; i++){
                 temp = list.get(i);
                 if(temp.type == setStep.ROI){
-                    Log.i(tag, "sx="+temp.start.x+"sy="+temp.start.y+"ex="+temp.end.x+"ey="+temp.end.y);
+                    Log.i(tag, "sx="+temp.start.x+" sy="+temp.start.y+" ex="+temp.end.x+" ey="+temp.end.y);
                     drawROI(canvas, temp.start, temp.end, paint);
                 }else if(temp.type == setStep.BANNER){
-                    Log.i(tag, "sx="+temp.start.x+"sy="+temp.start.y+"ex="+temp.end.x+"ey="+temp.end.y);
+                    Log.i(tag, "sx="+temp.start.x+" sy="+temp.start.y+" ex="+temp.end.x+" ey="+temp.end.y);
                     drawBanner(canvas, temp.start, temp.end, paint);
                 }else if(temp.type == setStep.TARGET){
-                    Log.i(tag, "sx="+temp.start.x+"sy="+temp.start.y+"ex="+temp.end.x+"ey="+temp.end.y);
+                    Log.i(tag, "sx="+temp.start.x+" sy="+temp.start.y+" ex="+temp.end.x+" ey="+temp.end.y);
                     drawTarget(canvas, temp.start, temp.end, paint);
                 }
             }
@@ -396,16 +463,16 @@ public class CameraPreviewActivity extends ActionBarActivity {
             switch (action) {
                 case MotionEvent.ACTION_DOWN:
                     debugText.setText("ACTION_DOWN (" + x + " , " + y + ")");
-                    startPt = projectXY(bitmapView, originBitmap, x, y);
+                    startPt = projectXY(bitmapView, resizeBitmap, x, y);
                     endPt = new projectPt();
                     break;
                 case MotionEvent.ACTION_MOVE:
                     debugText.setText("ACTION_MOVE (" + x + " , " + y + ")");
-                    drawOnRectProjectedBitMap(bitmapView, originBitmap, x, y);
+                    drawOnRectProjectedBitMap(bitmapView, resizeBitmap, x, y);
                     break;
                 case MotionEvent.ACTION_UP:
                     debugText.setText("ACTION_UP (" + x + " , " + y + ")");
-                    drawOnRectProjectedBitMap(bitmapView, originBitmap, x, y);
+                    drawOnRectProjectedBitMap(bitmapView, resizeBitmap, x, y);
                     finalizeDrawing();
                     break;
             }
@@ -414,32 +481,40 @@ public class CameraPreviewActivity extends ActionBarActivity {
     }
 
     private void handleButton(){
-        if(captureButton == null){
+        if(captureButton == null)
             Log.e(tag, "captureButton = Null");
-        }else {
+        else {
             captureButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View arg0) {
                     Canvas canvas = null;
                     Log.i(tag, "capture image!");
                     originBitmap = camPreview.captureImage();
-                    try{
-                        Rect dest = new Rect(0, 0, originBitmap.getWidth(), originBitmap.getHeight());
+
+
+                    float scaleWidth = screenWidth / (float) originBitmap.getWidth();
+                    float scaleHeight = screenHeight / (float) originBitmap.getHeight();
+                    Log.i("Alex", "SettingManager====> set scale value : " + scaleWidth + ":" + scaleHeight);
+                    Matrix matrix = new Matrix();
+                    matrix.postScale(scaleWidth, scaleHeight);
+                    resizeBitmap = Bitmap.createBitmap(originBitmap, 0, 0, originBitmap.getWidth(), originBitmap.getHeight(), matrix, true);
+
+
+                    try {
+                        Rect dest = new Rect(0, 0, resizeBitmap.getWidth(), resizeBitmap.getHeight());
                         Paint paint = new Paint();
                         paint.setFilterBitmap(true);
                         canvas = bitmapHolder.lockCanvas();
-                        canvas.drawBitmap(originBitmap, null, dest, paint);
-                        Log.i(tag, "width = "+originBitmap.getWidth()+"height = "+originBitmap.getHeight());
+                        canvas.drawBitmap(resizeBitmap, null, dest, paint);
+                        Log.i(tag, "width = " + resizeBitmap.getWidth() + "height = " + resizeBitmap.getHeight());
                         captureButton.setVisibility(View.INVISIBLE);
                         okButton.setVisibility(View.VISIBLE);
                         resetButton.setVisibility(View.VISIBLE);
-                    }catch (Exception E){
-
-                    }finally{
+                    } catch (Exception E) {
+                    } finally {
                         if (canvas != null)
                             bitmapHolder.unlockCanvasAndPost(canvas);
                     }
-
                 }
             });
         }
@@ -563,12 +638,13 @@ public class CameraPreviewActivity extends ActionBarActivity {
     {
         int numRoi;
         drawHistory tempRoi;
+        frameLayout.addView(progressBar);
         // upload picture
         Log.i(tag,"upload picture and training data!");
         if(originBitmap == null)
             return false;
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        originBitmap.compress(Bitmap.CompressFormat.JPEG , 100 , stream);
+        originBitmap.compress(Bitmap.CompressFormat.JPEG , 60 , stream);
         byte [] data = stream.toByteArray();
         List<NameValuePair> post = new ArrayList<NameValuePair>();
 
@@ -581,31 +657,48 @@ public class CameraPreviewActivity extends ActionBarActivity {
         post.add(new BasicNameValuePair("TagNum", Integer.toString(numRoi-1)));
 
         tempRoi = drawList.get(0);
+        tempRoi = projectROI(resizeBitmap,originBitmap,tempRoi); // resize => origin
         post.add(new BasicNameValuePair("ROI_X", Integer.toString(tempRoi.start.x)));
         post.add(new BasicNameValuePair("ROI_Y", Integer.toString(tempRoi.start.y)));
         post.add(new BasicNameValuePair("ROI_W", Integer.toString(tempRoi.start.x-tempRoi.end.x))); //abs?
         post.add(new BasicNameValuePair("ROI_H", Integer.toString(tempRoi.start.y-tempRoi.end.y)));
-        Log.i(tag, "ROI: name:" + tempRoi.type + " SX:" + tempRoi.start.x);
+        Log.i(tag, "ROI: name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
         for(int i=1; i<=numRoi-1; i++) {
             tempRoi = drawList.get(i);
+            tempRoi = projectROI(resizeBitmap, originBitmap, tempRoi); // resize => origin
             post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_T", " "));  // Tag Type
             post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_X", Integer.toString(tempRoi.start.x)));
             post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_Y", Integer.toString(tempRoi.start.y)));
             post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_W", Integer.toString(tempRoi.start.x-tempRoi.end.x)));
             post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_H", Integer.toString(tempRoi.start.y-tempRoi.end.y)));
-            Log.i(tag, "TAG:" + i + " name:" + tempRoi.type + " SX:" + tempRoi.start.x);
+            Log.i(tag, "TAG:" + i + " name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
         }
         post.add(new BasicNameValuePair("NUM", Integer.toString(save_num)));
         httpControl.httpHandleCmd(httpControl.url_upload, post,new ServerDone() {
             @Override
-            public void execute(String result) {
-                Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
+            public void execute(byte[] result) {
+                String str = new String(result);
+
+                Log.i(tag, str);
+                frameLayout.removeView(progressBar);
+                if(str.equals("Upload Success!") && httpControl.saves<3) {
+                    httpControl.saves += 1; // == save_num
+                    Toast.makeText(getBaseContext(), "Saving to #"+save_num, Toast.LENGTH_LONG).show();
+                }
+                else
+                    Toast.makeText(getBaseContext(), str, Toast.LENGTH_LONG).show();
+                finish();
             }
         });
-        if(originBitmap != null) {
+
+        if(resizeBitmap != null)
+            resizeBitmap.recycle();
+
+        if(originBitmap != null)
             originBitmap.recycle();
-        }
+
         return true;
     }
+
 
 }
