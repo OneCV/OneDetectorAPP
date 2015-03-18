@@ -12,6 +12,7 @@ import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.hardware.Camera.Parameters;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -19,6 +20,8 @@ import android.view.SurfaceHolder;
 import android.widget.ImageView;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 
 public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCallback{
@@ -29,16 +32,17 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 	private final String tag = "CameraPreviewClass";
 	private boolean bProcessing = false;
 	private byte[] frameData = null;
-	private int[] outData = null;
+    private int resultData[] = new int[201];
 	private Bitmap bitmap = null;
 	private SurfaceHolder gDrawHolder;
     private int taskStatus;
 	Handler mHandler = new Handler(Looper.getMainLooper());
-	public native boolean cvObjectDetectionInit();
+	public native boolean cvObjectDetectionInit(long length, byte[] examBuffer);
 	public rectObject rectClass = new rectObject();
 	public Camera mCamera = null;
     public final int TRAINING_TASK = 1;
     public final int CVPROCESS_TASK = 2;
+    public static int initFlag = 0;
 	
 	public class rectObject{
 		public int x;
@@ -49,15 +53,39 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 	
 	public CameraPreview(int previewWidth, int previewHeight, int screenWidth, int screenHeight, SurfaceHolder drawHolder)
 	{
+        File file = new File(Environment.getExternalStorageDirectory()+"/Examinator.dk");
+        FileInputStream fin = null;
+        long fileLength = 0;
+        byte[] dkFile = null;
 		gPreviewWidth = previewWidth;
 		gPreviewHeight = previewHeight;
         gscreenWidth = screenWidth;
         gscreenHeight = screenHeight;
 		gDrawHolder = drawHolder;
-		//bitmap = camPreview.getDrawingCache();
-		//bitmap = Bitmap.createBitmap(gPreviewWidth, gPreviewHeight, Bitmap.Config.ARGB_8888);
-		outData = new int[gPreviewWidth*gPreviewHeight];
-		cvObjectDetectionInit();
+        try {
+            fin = new FileInputStream(file);
+            fileLength = file.length();
+            Log.i(tag, "dk file length"+fileLength);
+            dkFile = new byte[(int)fileLength];
+            fin.read(dkFile);
+
+        }catch (IOException e){
+            e.printStackTrace();
+        }finally {
+            try{
+                if(fin != null){
+                    fin.close();
+                }
+            }catch (IOException e){
+                e.printStackTrace();
+            }
+        }
+
+        if(initFlag == 0) {
+            Log.i(tag, "cvObjectDetectionInit entry!");
+            cvObjectDetectionInit(fileLength, dkFile);
+            initFlag = 1;
+        }
 	}
 	
 	@Override
@@ -180,8 +208,7 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 
 	// load JNI
 	// declare JNI api
-	public native boolean cvipProcessing(int width, int height, byte[] srcData, int[] outData, rectObject rectClass);
-	
+    public native int cvipProcessing(int width, int height, byte[] srcDataa, int[] resultData);
 	
 	static
 	{
@@ -198,38 +225,59 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 		public void run()
 		{
 			Canvas canvas = null;
+            int offset = 0;
+            int count = 0;
+            int id;
 			Paint paint = new Paint();			
 			bProcessing = true;
-			cvipProcessing(gPreviewWidth, gPreviewHeight, frameData, outData, rectClass);
+            cvipProcessing(gPreviewWidth, gPreviewHeight, frameData, resultData);
 			//Log.i(tag, String.format("outdata=%x", outData[10000]));
-			//Log.d(tag, String.format("x=%d y=%d width=%d height=%d", rectClass.x, rectClass.y, rectClass.width, rectClass.height));
-			paint.setColor(Color.CYAN);
-			try{
-				canvas = gDrawHolder.lockCanvas();
+            Log.d(tag, String.format("tag=%d", resultData[0]));
 
-				paint.setXfermode(new PorterDuffXfermode(Mode.CLEAR));
-				canvas.drawPaint(paint);
-				paint.setXfermode(new PorterDuffXfermode(Mode.SRC));
+            for(int i=0; i<resultData[0]; i++) {
+                count++;
+                id = resultData[count+offset];
+                rectClass.x = resultData[count+offset+1];
+                rectClass.y = resultData[count+offset+2];
+                rectClass.width = resultData[count+offset+3];
+                rectClass.height = resultData[count+offset+4];
+                offset+=4;
+                Log.d(tag, String.format("id=%d x=%d y=%d width=%d height=%d", id, rectClass.x, rectClass.y, rectClass.width, rectClass.height));
+                paint.setColor(Color.CYAN);
+                try {
+                    canvas = gDrawHolder.lockCanvas();
+                    paint.setXfermode(new PorterDuffXfermode(Mode.CLEAR));
+                    canvas.drawPaint(paint);
+                    paint.setXfermode(new PorterDuffXfermode(Mode.SRC));
 
-		        paint.setColor(Color.RED);
-		        paint.setStrokeWidth(2);
-		        paint.setStyle(Paint.Style.STROKE);
-                //Log.i(tag, "Runnable gPreviewSize = " + gPreviewWidth + " * " + gPreviewHeight);
-                double scalex = gscreenWidth/(double)gPreviewWidth;
-                double scaley = gscreenHeight/(double)gPreviewHeight;
-                rectClass.x = (int)(rectClass.x*scalex);
-                rectClass.y = (int)(rectClass.y*scaley);
-                rectClass.width = (int)(rectClass.width*scalex);
-                rectClass.height = (int)(rectClass.height*scaley);
-		        canvas.drawRect(rectClass.x, rectClass.y, (rectClass.x+rectClass.width)-1, (rectClass.y+rectClass.height)-1, paint);
-		       
-			}catch (Exception e) {  
-                e.printStackTrace(); 
-			}finally{
-				if (canvas != null)
-					gDrawHolder.unlockCanvasAndPost(canvas); 
-			}
-			
+                    paint.setColor(Color.RED);
+                    paint.setStrokeWidth(2);
+                    paint.setStyle(Paint.Style.STROKE);
+                    canvas.drawRect(rectClass.x, rectClass.y, (rectClass.x + rectClass.width) - 1, (rectClass.y + rectClass.height) - 1, paint);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    //Log.i(tag, String.format("ssssssss"));
+                    if (canvas != null)
+                        gDrawHolder.unlockCanvasAndPost(canvas);
+                }
+            }
+            if(resultData[0] == 0)
+            {
+                //clean the canvas;
+                try {
+                    canvas = gDrawHolder.lockCanvas();
+                    paint.setXfermode(new PorterDuffXfermode(Mode.CLEAR));
+                    canvas.drawPaint(paint);
+                }catch(Exception e){
+                    e.printStackTrace();
+                }finally {
+                    if(canvas != null)
+                        gDrawHolder.unlockCanvasAndPost(canvas);
+                }
+
+            }
 			//bitmap.setPixels(outData, 0, gPreviewWidth, 0, 0, gPreviewWidth, gPreviewHeight);
 			//gCamPreview.setImageBitmap(bitmap);
 			bProcessing = false;

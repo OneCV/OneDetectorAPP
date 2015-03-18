@@ -165,8 +165,9 @@ public class CameraPreviewActivity extends ActionBarActivity {
         if(i==-1)
             Log.e("CV", "CameraPreviewSizes do not support");
 
-        previewWidth = screenWidth;
-        previewHeight = screenHeight;
+        // previewSize = screenSize
+        //previewWidth = screenWidth;
+        //previewHeight = screenHeight;
 
         it = getIntent();
 		recordStatus = it.getStringExtra("record");
@@ -627,7 +628,24 @@ public class CameraPreviewActivity extends ActionBarActivity {
                 @Override
                 public void onClick(View arg0) {
                     Log.i(tag, "Done transfer data to the server");
+                    if(settingStatus >= setStep.TARGET){
+                        Log.i(tag, "setting target ok!(done)");
+                        Canvas canvas = null;
+                        Paint paint = new Paint();
+                        canvas = bufferHolder.lockCanvas();
+                        drawHistory temp = new drawHistory(setStep.TARGET, startPt, endPt);
+                        drawList.add(temp);
+                        drawSettingList(drawList, canvas, paint);
+                        if(canvas != null)
+                            bufferHolder.unlockCanvasAndPost(canvas);
+                        okButton.setVisibility(View.INVISIBLE);
+                        resetButton.setVisibility(View.INVISIBLE);
+                        doneButton.setVisibility(View.INVISIBLE);
+                        settingStatus++;
+                    }
                     transferDKDK();
+                    //known issue, if you press done after send to server...won't fix due to must go to jni process
+
                 }
             });
         }
