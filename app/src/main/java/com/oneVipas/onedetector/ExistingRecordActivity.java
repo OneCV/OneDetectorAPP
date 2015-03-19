@@ -121,6 +121,7 @@ public class ExistingRecordActivity extends ActionBarActivity {
 
                     Intent it = new Intent(ExistingRecordActivity.this, CameraPreviewActivity.class);
                     it.putExtra("record", "pass");
+                    it.putExtra("JNI", result);
                     startActivity(it);
                 } catch (Exception e) {
                     e.printStackTrace();

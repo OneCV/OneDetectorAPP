@@ -16,6 +16,7 @@ import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.hardware.Camera;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.v7.app.ActionBarActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -40,6 +41,10 @@ import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -111,7 +116,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
         public static final int BANNER = 2;
         public static final int TARGET = 3;
     }
-	
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
         Log.i(tag,"CameraPreviewActivity onCreate");
@@ -153,7 +158,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
         int i;
         for (i = length-1; i >= 0; i--) {
             Log.d("CV","SupportedPreviewSizes : " + previewSizes.get(i).width + "x" + previewSizes.get(i).height);
-            if(previewSizes.get(i).height>640 && previewSizes.get(i).width>480)
+            if(previewSizes.get(i).height>=480 && previewSizes.get(i).width>=640)
             {
                 previewWidth = previewSizes.get(i).width;
                 previewHeight = previewSizes.get(i).height;
@@ -165,7 +170,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
         if(i==-1)
             Log.e("CV", "CameraPreviewSizes do not support");
 
-        // previewSize = screenSize
+        // previewSize = screenSize     output_sp.apk
         //previewWidth = screenWidth;
         //previewHeight = screenHeight;
 
@@ -174,7 +179,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
         if(recordStatus != null){
 		    if (recordStatus.equals("pass")){
 			    Log.d(tag, "camera activity!");
-			    enableCameraPreview();
+			    enableCameraPreview(it.getByteArrayExtra("JNI"));
 		    }
             else
 			    Log.e(tag, "unexception login status");
@@ -236,7 +241,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
         bufferView = new SurfaceView(this);
         bufferHolder = bufferView.getHolder();
 
-        camPreview = new CameraPreview(previewWidth, previewHeight, screenWidth, screenHeight, drawHolder);
+        camPreview = new CameraPreview(previewWidth, previewHeight, screenWidth, screenHeight, drawHolder,null);
         camPreview.sendStatus(camPreview.TRAINING_TASK);
         camHolder.addCallback(camPreview);
         camHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
@@ -264,13 +269,13 @@ public class CameraPreviewActivity extends ActionBarActivity {
         frameLayout.addView(debugText);
     }
 
-	public void enableCameraPreview(){
+	public void enableCameraPreview(byte[] JNI){
         camView = new SurfaceView(this);
 		camHolder = camView.getHolder();
 		drawView = new SurfaceView(this);
 		drawHolder = drawView.getHolder();
 
-		camPreview = new CameraPreview(previewWidth, previewHeight, screenWidth, screenHeight, drawHolder);
+		camPreview = new CameraPreview(previewWidth, previewHeight, screenWidth, screenHeight, drawHolder,JNI);
         camPreview.sendStatus(camPreview.CVPROCESS_TASK);
 		camHolder.addCallback(camPreview);
 		camHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
@@ -369,7 +374,21 @@ public class CameraPreviewActivity extends ActionBarActivity {
                 }
             }
     }
-
+    private drawHistory fixROI(drawHistory pt)
+    {
+        int temp;
+        if(pt.start.x > pt.end.x) {
+            temp = pt.start.x;
+            pt.start.x = pt.end.x;
+            pt.end.x = temp;
+        }
+        if(pt.start.y > pt.end.y) {
+            temp = pt.start.y;
+            pt.start.y = pt.end.y;
+            pt.end.y = temp;
+        }
+        return pt;
+    }
     private void drawROI(Canvas canvas, projectPt start, projectPt end, Paint paint){
         if(canvas != null && paint != null){
             paint.setStyle(Paint.Style.STROKE);
@@ -651,7 +670,81 @@ public class CameraPreviewActivity extends ActionBarActivity {
         }
     }
 
+    private ByteArrayOutputStream convertBMP(Bitmap jpeg)
+    {
 
+        int WIDTH = jpeg.getWidth();
+        int HEIGHT = jpeg.getHeight();
+        int PADDING = (4-WIDTH*3%4)%4;
+        int IMG_SIZE = (WIDTH*3+PADDING)*HEIGHT;
+
+        short header[] = {
+                0x4d42,
+                (short)((IMG_SIZE+54)<<16>>16),(short)((IMG_SIZE+54)>>16),
+                0,0,
+                0x0036,0,
+                0x0028,0,
+                (short)(WIDTH<<16>>16),(short)(WIDTH>>16),
+                (short)(HEIGHT<<16>>16),(short)(HEIGHT>>16),
+                1,
+                0x18,
+                0,0,
+                (short)(IMG_SIZE<<16>>16),(short)(IMG_SIZE>>16),
+                0,0,
+                0,0,
+                0,0,
+                0,0
+        };
+
+        int i,j;
+        byte pad[] = new byte[3];		// padding
+        byte pixel[] = new byte[3];			// B G R
+        pad[0]=0;
+        pad[1]=0;
+        pad[2]=0;
+        ByteArrayOutputStream mp;
+        try {
+            //mp = fopen("bmp.bmp","wb");
+            //FileOutputStream mp = new FileOutputStream(Environment.getExternalStorageDirectory()+"/DK.bmp");
+            mp = new ByteArrayOutputStream();
+
+            //fwrite(header, 2, sizeof(header) / 2, mp);
+            for(i=0;i<header.length;i++) {
+                mp.write((byte) (header[i] & 0xff));        // low byte
+                mp.write((byte) (header[i]>>8 & 0xff));     // high byte
+            }
+
+            int[] data = new int[WIDTH * HEIGHT];
+            jpeg.getPixels(data, 0, WIDTH, 0, 0, WIDTH, HEIGHT);
+
+            for (i = 0; i < HEIGHT; ++i)
+            {
+                for (j = 0; j < WIDTH; ++j)
+                {
+                    int index = (HEIGHT-i-1) * WIDTH + j;   // *Up Down Reverse to get correct BMP
+                    byte r = (byte)((data[index] >> 16) & 0xff);
+                    byte g = (byte)((data[index] >> 8) & 0xff);
+                    byte b = (byte)(data[index] & 0xff);
+
+                    pixel[2] = r;   // R
+                    pixel[1] = g; 	// G
+                    pixel[0] = b; 	// B
+
+                    //fwrite(pixel,1,3,mp);
+                    mp.write(pixel);
+                }
+                //fwrite(&pad,1,PADDING,mp);		// 填充成 DWORD = 4byte
+                mp.write(pad,1,PADDING);
+            }
+                //fclose(mp);
+                mp.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        return mp;
+    }
     private boolean transferDKDK()
     {
         int numRoi;
@@ -661,8 +754,13 @@ public class CameraPreviewActivity extends ActionBarActivity {
         Log.i(tag,"upload picture and training data!");
         if(originBitmap == null)
             return false;
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        originBitmap.compress(Bitmap.CompressFormat.JPEG , 60 , stream);
+        //ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        //originBitmap.compress(Bitmap.CompressFormat.JPEG , 60 , stream);
+
+        Log.i(tag, "forming bmp ... ");
+        ByteArrayOutputStream stream = convertBMP(originBitmap);
+        Log.i(tag, "forming bmp ... finished! ");
+
         byte [] data = stream.toByteArray();
         List<NameValuePair> post = new ArrayList<NameValuePair>();
 
@@ -675,21 +773,25 @@ public class CameraPreviewActivity extends ActionBarActivity {
         post.add(new BasicNameValuePair("TagNum", Integer.toString(numRoi-1)));
 
         tempRoi = drawList.get(0);
+        tempRoi = fixROI(tempRoi);
         tempRoi = projectROI(resizeBitmap,originBitmap,tempRoi); // resize => origin
         post.add(new BasicNameValuePair("ROI_X", Integer.toString(tempRoi.start.x)));
         post.add(new BasicNameValuePair("ROI_Y", Integer.toString(tempRoi.start.y)));
-        post.add(new BasicNameValuePair("ROI_W", Integer.toString(tempRoi.start.x-tempRoi.end.x))); //abs?
-        post.add(new BasicNameValuePair("ROI_H", Integer.toString(tempRoi.start.y-tempRoi.end.y)));
-        Log.i(tag, "ROI: name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
+        post.add(new BasicNameValuePair("ROI_W", Integer.toString(tempRoi.end.x-tempRoi.start.x))); //abs?
+        post.add(new BasicNameValuePair("ROI_H", Integer.toString(tempRoi.end.y-tempRoi.start.y)));
+        //Log.i(tag, "ROI: name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
+        Log.i(tag, "ROI: name:" + tempRoi.type + " X:" + tempRoi.start.x + " Y:" + tempRoi.start.y + " W:" + Integer.toString(tempRoi.end.x-tempRoi.start.x) + " H:" + Integer.toString(tempRoi.end.y-tempRoi.start.y));
         for(int i=1; i<=numRoi-1; i++) {
             tempRoi = drawList.get(i);
+            tempRoi = fixROI(tempRoi);
             tempRoi = projectROI(resizeBitmap, originBitmap, tempRoi); // resize => origin
             post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_T", " "));  // Tag Type
             post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_X", Integer.toString(tempRoi.start.x)));
             post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_Y", Integer.toString(tempRoi.start.y)));
-            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_W", Integer.toString(tempRoi.start.x-tempRoi.end.x)));
-            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_H", Integer.toString(tempRoi.start.y-tempRoi.end.y)));
-            Log.i(tag, "TAG:" + i + " name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
+            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_W", Integer.toString(tempRoi.end.x-tempRoi.start.x)));
+            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_H", Integer.toString(tempRoi.end.y-tempRoi.start.y)));
+            //Log.i(tag, "TAG:" + i + " name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
+            Log.i(tag, "TAG:" + i + " name:" + tempRoi.type + " X:" + tempRoi.start.x + " Y:" + tempRoi.start.y + " W:" + Integer.toString(tempRoi.end.x-tempRoi.start.x) + " H:" + Integer.toString(tempRoi.end.y-tempRoi.start.y));
         }
         post.add(new BasicNameValuePair("NUM", Integer.toString(save_num)));
         httpControl.httpHandleCmd(httpControl.url_upload, post,new ServerDone() {
@@ -699,7 +801,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
 
                 Log.i(tag, str);
                 frameLayout.removeView(progressBar);
-                if(str.equals("Upload Success!") && httpControl.saves<3) {
+                if(str.substring(str.length()-15).equals("Upload Success!") && httpControl.saves<3) {
                     httpControl.saves += 1; // == save_num
                     Toast.makeText(getBaseContext(), "Saving to #"+save_num, Toast.LENGTH_LONG).show();
                 }

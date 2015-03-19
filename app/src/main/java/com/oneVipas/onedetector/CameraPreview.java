@@ -18,10 +18,12 @@ import android.os.Looper;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 
 public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCallback{
@@ -51,17 +53,18 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 		public int height;
 	}
 	
-	public CameraPreview(int previewWidth, int previewHeight, int screenWidth, int screenHeight, SurfaceHolder drawHolder)
+	public CameraPreview(int previewWidth, int previewHeight, int screenWidth, int screenHeight, SurfaceHolder drawHolder,byte[] JNI)
 	{
-        File file = new File(Environment.getExternalStorageDirectory()+"/Examinator.dk");
+        gPreviewWidth = previewWidth;
+        gPreviewHeight = previewHeight;
+        gscreenWidth = screenWidth;
+        gscreenHeight = screenHeight;
+        gDrawHolder = drawHolder;
+
+/*
         FileInputStream fin = null;
         long fileLength = 0;
         byte[] dkFile = null;
-		gPreviewWidth = previewWidth;
-		gPreviewHeight = previewHeight;
-        gscreenWidth = screenWidth;
-        gscreenHeight = screenHeight;
-		gDrawHolder = drawHolder;
         try {
             fin = new FileInputStream(file);
             fileLength = file.length();
@@ -80,11 +83,23 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
                 e.printStackTrace();
             }
         }
-
-        if(initFlag == 0) {
+        */
+        if(JNI!=null) {
             Log.i(tag, "cvObjectDetectionInit entry!");
-            cvObjectDetectionInit(fileLength, dkFile);
-            initFlag = 1;
+            //cvObjectDetectionInit(fileLength, dkFile);
+            cvObjectDetectionInit(JNI.length, JNI);
+            Log.d(tag, "loading JNI");
+            // initFlag = 1;
+            /*
+            File file = new File(Environment.getExternalStorageDirectory()+"/Examinator.dk");
+            try {
+                FileOutputStream fout = new FileOutputStream(file);
+                fout.write(JNI);
+                fout.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            */
         }
 	}
 	
@@ -208,7 +223,7 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 
 	// load JNI
 	// declare JNI api
-    public native int cvipProcessing(int width, int height, byte[] srcDataa, int[] resultData);
+    public native int cvipProcessing(int width, int height, byte[] srcData, int[] resultData);
 	
 	static
 	{
@@ -253,6 +268,15 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
                     paint.setColor(Color.RED);
                     paint.setStrokeWidth(2);
                     paint.setStyle(Paint.Style.STROKE);
+
+                    //Log.i(tag, "Runnable gPreviewSize = " + gPreviewWidth + " * " + gPreviewHeight);
+                    double scalex = gscreenWidth/(double)gPreviewWidth;
+                    double scaley = gscreenHeight/(double)gPreviewHeight;
+                    rectClass.x = (int)(rectClass.x*scalex);
+                    rectClass.y = (int)(rectClass.y*scaley);
+                    rectClass.width = (int)(rectClass.width*scalex);
+                    rectClass.height = (int)(rectClass.height*scaley);
+
                     canvas.drawRect(rectClass.x, rectClass.y, (rectClass.x + rectClass.width) - 1, (rectClass.y + rectClass.height) - 1, paint);
 
                 } catch (Exception e) {
