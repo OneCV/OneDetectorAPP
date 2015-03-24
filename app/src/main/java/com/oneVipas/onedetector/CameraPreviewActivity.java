@@ -155,14 +155,26 @@ public class CameraPreviewActivity extends ActionBarActivity {
         params = mCamera.getParameters();
         List<Camera.Size> previewSizes = params.getSupportedPreviewSizes();
         int length = previewSizes.size();
-        int i;
-        for (i = length-1; i >= 0; i--) {
+        Log.i("CV", "There exist " + length + " kinds of CameraPreviewSizes");
+        // Let it search from small size to big size
+        int order,i;
+        if(previewSizes.get(0).width>previewSizes.get(length-1).width) {
+            order = -1;
+            i = length - 1;
+        }
+        else
+        {
+            order = 1;
+            i = 0;
+        }
+        for (; i >= 0 && i <= (length-1); i+=order) {
             Log.d("CV","SupportedPreviewSizes : " + previewSizes.get(i).width + "x" + previewSizes.get(i).height);
-            if(previewSizes.get(i).height>=480 && previewSizes.get(i).width>=640)
+            if(previewSizes.get(i).width==640 && previewSizes.get(i).height==480)
             {
                 previewWidth = previewSizes.get(i).width;
                 previewHeight = previewSizes.get(i).height;
                 Log.i("CV", "CameraPreviewSizes = " + previewWidth + "x" + previewHeight);
+                Toast.makeText(getBaseContext(), "CameraPreviewSizes = " + previewWidth + "x" + previewHeight, Toast.LENGTH_LONG).show();
                 break;
             }
         }
@@ -462,7 +474,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
     private void finalizeDrawing(){
         okButton.setVisibility(View.VISIBLE);
         resetButton.setVisibility(View.VISIBLE);
-        if(settingStatus >= setStep.TARGET){
+        if(settingStatus >= setStep.BANNER){
             doneButton.setVisibility(View.VISIBLE);
         }
     }
@@ -647,12 +659,12 @@ public class CameraPreviewActivity extends ActionBarActivity {
                 @Override
                 public void onClick(View arg0) {
                     Log.i(tag, "Done transfer data to the server");
-                    if(settingStatus >= setStep.TARGET){
+                    if(settingStatus >= setStep.BANNER){
                         Log.i(tag, "setting target ok!(done)");
                         Canvas canvas = null;
                         Paint paint = new Paint();
                         canvas = bufferHolder.lockCanvas();
-                        drawHistory temp = new drawHistory(setStep.TARGET, startPt, endPt);
+                        drawHistory temp = new drawHistory(settingStatus, startPt, endPt);
                         drawList.add(temp);
                         drawSettingList(drawList, canvas, paint);
                         if(canvas != null)

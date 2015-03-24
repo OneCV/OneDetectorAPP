@@ -131,27 +131,41 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
 		Parameters params;
 		params = mCamera.getParameters();
 		imageFormat = params.getPreviewFormat();
+
+        params.setPreviewSize(gPreviewWidth, gPreviewHeight);
+        Log.i(tag, String.format("Set Camera Preview size to %d x %d", gPreviewWidth, gPreviewHeight));
+        try	{
+            mCamera.setParameters(params);
+        }
+        catch(Exception e) {
+            Log.e(tag,"Setting Camera Preview size Failed");
+            Log.w(tag,e.toString());
+        }
+
         params.setFocusMode(Parameters.FOCUS_MODE_AUTO);
-		params.setPreviewSize(gPreviewWidth, gPreviewHeight);
 		try	{
 			mCamera.setParameters(params);
 		}
 		catch(Exception e) {
-			Log.w(tag,e.toString());
+            Log.e(tag,"Setting AutoFocus Failed");
+			Log.w(tag, e.toString());
 		}
+
 		mCamera.startPreview();
 
 	}
 
 	@Override
 	public void surfaceDestroyed(SurfaceHolder holder) {
-	    try {
-            mCamera.stopPreview();
-            mCamera.setPreviewCallback(null);
-            mCamera.release();
-            mCamera = null;
-        }catch (Exception e) {
-            e.printStackTrace();
+        if(mCamera!=null) {
+            try {
+                mCamera.stopPreview();
+                mCamera.setPreviewCallback(null);
+                mCamera.release();
+                mCamera = null;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
