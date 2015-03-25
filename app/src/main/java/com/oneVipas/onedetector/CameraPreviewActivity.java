@@ -8,13 +8,10 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
-import android.graphics.Point;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
-import android.hardware.Camera;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
 import android.util.DisplayMetrics;
@@ -40,16 +37,16 @@ import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
 public class CameraPreviewActivity extends ActionBarActivity {
 
-	private String tag = "CameraPreviewActivity";
+	private String tag = "oneDetector";
 	private int dpi;
-	private int previewWidth, previewHeight;
-    private int screenWidth, screenHeight;
+	private int gDispWidth, gDispHeight;
 	private CameraPreview camPreview = null;
 	private SurfaceView camView = null, bitmapView = null, drawView = null, bufferView = null;
 	private SurfaceHolder camHolder = null, bitmapHolder = null, bufferHolder = null, drawHolder = null;
@@ -63,12 +60,12 @@ public class CameraPreviewActivity extends ActionBarActivity {
     private int status = 0, settingStatus = 0;
     private final int GET_TRAINING = 1;
     private projectPt startPt, endPt;
-    private Bitmap resizeBitmap;
+    private projectPt oriStartPt, oriEndPt;
     private LinkedList <drawHistory> drawList;
     private settingStep setStep = new settingStep();
     private ServerControl httpControl;
     private int save_num;
-    private Bitmap originBitmap;
+    private Bitmap originBitmap, scaleBitmap;
 
     class projectPt {
         int x;
@@ -87,21 +84,28 @@ public class CameraPreviewActivity extends ActionBarActivity {
 
     class drawHistory{
         int type;
-        projectPt start, end;
-
-        drawHistory(int typeInit, projectPt startInit, projectPt endInit){
+        projectPt start, end, oriStart, oriEnd;
+        drawHistory(int typeInit, projectPt startInit, projectPt endInit, projectPt oriStartInit, projectPt oriEndInit){
             start = new projectPt();
             end = new projectPt();
+            oriStart = new projectPt();
+            oriEnd = new projectPt();
             type = typeInit;
             start.x = startInit.x;
             start.y = startInit.y;
             end.x = endInit.x;
             end.y = endInit.y;
+            oriStart.x = oriStartInit.x;
+            oriStart.y = oriStartInit.y;
+            oriEnd.x = oriEndInit.x;
+            oriEnd.y = oriEndInit.y;
         }
 
         drawHistory(){
             start = new projectPt();
             end = new projectPt();
+            oriStart = new projectPt();
+            oriEnd = new projectPt();
         }
     }
 
@@ -111,7 +115,23 @@ public class CameraPreviewActivity extends ActionBarActivity {
         public static final int BANNER = 2;
         public static final int TARGET = 3;
     }
-	
+
+    private void getDisplaySize(){
+        //Initial setting
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        dpi = metrics.densityDpi;
+        if (metrics.widthPixels > metrics.heightPixels) {
+            gDispWidth = metrics.widthPixels;
+            gDispHeight = metrics.heightPixels;
+        } else {
+            gDispWidth = metrics.heightPixels;
+            gDispHeight = metrics.widthPixels;
+        }
+        Log.i(tag, "dpi = " + dpi + " , w = " + gDispWidth+ " , h = " + gDispHeight);
+    }
+
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
         Log.i(tag,"CameraPreviewActivity onCreate");
@@ -130,66 +150,28 @@ public class CameraPreviewActivity extends ActionBarActivity {
         progressBar = (ProgressBar)findViewById(R.id.progressBar);
         frameLayout.removeView(progressBar);
         httpControl = new ServerControl();
-
-        DisplayMetrics metrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(metrics);
-
-
-        dpi = metrics.densityDpi;
-        if (metrics.widthPixels > metrics.heightPixels) {
-            screenWidth = metrics.widthPixels;
-            screenHeight = metrics.heightPixels;
-        } else {
-            screenWidth = metrics.heightPixels;
-            screenHeight = metrics.widthPixels;
-        }
-        Log.i(tag, "Screen dpi = " + dpi + " , w = " + screenWidth+ " , h = " + screenHeight);
-
-        Camera.Parameters params;
-        Camera mCamera = Camera.open();
-        params = mCamera.getParameters();
-        List<Camera.Size> previewSizes = params.getSupportedPreviewSizes();
-        int length = previewSizes.size();
-        int i;
-        for (i = length-1; i >= 0; i--) {
-            Log.d("CV","SupportedPreviewSizes : " + previewSizes.get(i).width + "x" + previewSizes.get(i).height);
-            if(previewSizes.get(i).height>640 && previewSizes.get(i).width>480)
-            {
-                previewWidth = previewSizes.get(i).width;
-                previewHeight = previewSizes.get(i).height;
-                Log.i("CV", "CameraPreviewSizes = " + previewWidth + "x" + previewHeight);
-                break;
-            }
-        }
-        mCamera.release();
-        if(i==-1)
-            Log.e("CV", "CameraPreviewSizes do not support");
-
-        previewWidth = screenWidth;
-        previewHeight = screenHeight;
-
-        it = getIntent();
+        getDisplaySize();
+		it = getIntent();
 		recordStatus = it.getStringExtra("record");
         if(recordStatus != null){
 		    if (recordStatus.equals("pass")){
-			    Log.d(tag, "camera activity!");
-			    enableCameraPreview();
-		    }
-            else
+			    Log.i(tag, "CameraPreviewActivity:camera activity!");
+			    enableCameraPreview(it.getByteArrayExtra("dkfile"));
+		    }else{
 			    Log.e(tag, "unexception login status");
-
+		    }
         }
         serviceStatus = it.getStringExtra("newTraining");
         if (serviceStatus != null) {
             if (serviceStatus.equals("goCamera")) {
-                Log.d(tag, "camera  training activity!");
+                Log.i(tag, "CameraPreviewActivity:camera  training activity!");
                 enableTrainingSetting();
-            }
-            else
+            } else {
                 Log.e(tag, "unexception login status");
+            }
         }
-        handleButton();
 
+        handleButton();
 	}
 
     public void enableTrainingSetting(){
@@ -225,7 +207,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
             AlertDialog alertDialog = alertDialogBuilder.create();
             alertDialog.show();
         }
-        //Initial setting
+
         camView = new SurfaceView(this);
         camHolder = camView.getHolder();
         drawView = new SurfaceView(this);
@@ -235,7 +217,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
         bufferView = new SurfaceView(this);
         bufferHolder = bufferView.getHolder();
 
-        camPreview = new CameraPreview(previewWidth, previewHeight, screenWidth, screenHeight, drawHolder);
+        camPreview = new CameraPreview(gDispWidth, gDispHeight, drawHolder);
         camPreview.sendStatus(camPreview.TRAINING_TASK);
         camHolder.addCallback(camPreview);
         camHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
@@ -246,10 +228,10 @@ public class CameraPreviewActivity extends ActionBarActivity {
         drawView.setZOrderOnTop(true);
         drawHolder.setFormat(PixelFormat.TRANSPARENT);
 
-        frameLayout.addView(camView, new LayoutParams(screenWidth,screenHeight));
-        frameLayout.addView(bitmapView, new LayoutParams(screenWidth,screenHeight));
-        frameLayout.addView(bufferView, new LayoutParams(screenWidth, screenHeight));
-        frameLayout.addView(drawView, new LayoutParams(screenWidth,screenHeight));  // previewWidth,previewHeight
+        frameLayout.addView(camView, new LayoutParams(gDispWidth,gDispHeight));
+        frameLayout.addView(bitmapView, new LayoutParams(gDispWidth,gDispHeight));
+        frameLayout.addView(bufferView, new LayoutParams(gDispWidth, gDispHeight));
+        frameLayout.addView(drawView, new LayoutParams(gDispWidth,gDispHeight));  // previewWidth,previewHeight
 
         frameLayout.removeView(captureButton);
         frameLayout.addView(captureButton);
@@ -263,13 +245,14 @@ public class CameraPreviewActivity extends ActionBarActivity {
         frameLayout.addView(debugText);
     }
 
-	public void enableCameraPreview(){
+	public void enableCameraPreview(byte[] dkFile){
         camView = new SurfaceView(this);
 		camHolder = camView.getHolder();
 		drawView = new SurfaceView(this);
 		drawHolder = drawView.getHolder();
 
-		camPreview = new CameraPreview(previewWidth, previewHeight, screenWidth, screenHeight, drawHolder);
+		camPreview = new CameraPreview(gDispWidth, gDispHeight, drawHolder);
+        camPreview.DetectionInit(dkFile);
         camPreview.sendStatus(camPreview.CVPROCESS_TASK);
 		camHolder.addCallback(camPreview);
 		camHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
@@ -278,8 +261,8 @@ public class CameraPreviewActivity extends ActionBarActivity {
 		frameLayout = (FrameLayout) findViewById(R.id.FrameLayout1);
 		//frameLayout.addView(camView, new LayoutParams(1196,720));
 		//frameLayout.addView(drawView, new LayoutParams(1196,720));  // previewWidth,previewHeight
-        frameLayout.addView(camView, new LayoutParams(screenWidth,screenHeight));
-        frameLayout.addView(drawView, new LayoutParams(screenWidth,screenHeight));  // previewWidth,previewHeight
+        frameLayout.addView(camView, new LayoutParams(gDispWidth,gDispHeight));
+        frameLayout.addView(drawView, new LayoutParams(gDispWidth,gDispHeight));  // previewWidth,previewHeight
 
 	}
 
@@ -324,27 +307,16 @@ public class CameraPreviewActivity extends ActionBarActivity {
 		*/
 	}
 
-    private projectPt projectXY(int fromWidth,int fromHeight, int toWidth, int toHeight, int x, int y) {
-
-        if (x < 0 || y < 0 || x > fromWidth || y > fromHeight) {
+    private projectPt projectXY(SurfaceView sv, Bitmap bp, int x, int y) {
+        if (x < 0 || y < 0 || x > sv.getWidth() || y > sv.getHeight()) {
             // outside ImageView
             return null;
         } else {
-            int projectedX = (int)((double)x * ((double)toWidth/(double)fromWidth));
-            int projectedY = (int)((double)y * ((double)toHeight/(double)fromHeight));
+            int projectedX = (int)((double)x * ((double)bp.getWidth()/(double)sv.getWidth()));
+            int projectedY = (int)((double)y * ((double)bp.getHeight()/(double)sv.getHeight()));
 
             return new projectPt(projectedX, projectedY);
         }
-    }
-
-    private projectPt projectXY(SurfaceView sv, Bitmap bp, int x, int y) {
-        return projectXY(sv.getWidth(),sv.getHeight(),bp.getWidth(),bp.getHeight(),x,y);
-    }
-
-    private drawHistory projectROI(Bitmap resizeBitmap, Bitmap originBitmap, drawHistory tempRoi) {
-        tempRoi.start = projectXY(resizeBitmap.getWidth(),resizeBitmap.getHeight(),originBitmap.getWidth(),originBitmap.getHeight(),tempRoi.start.x,tempRoi.start.y);
-        tempRoi.end = projectXY(resizeBitmap.getWidth(),resizeBitmap.getHeight(),originBitmap.getWidth(),originBitmap.getHeight(),tempRoi.end.x,tempRoi.end.y);
-        return tempRoi;
     }
 
     private void drawSettingList(LinkedList <drawHistory> list, Canvas canvas, Paint paint){
@@ -357,13 +329,13 @@ public class CameraPreviewActivity extends ActionBarActivity {
             for(int i=0; i<size; i++){
                 temp = list.get(i);
                 if(temp.type == setStep.ROI){
-                    Log.i(tag, "sx="+temp.start.x+" sy="+temp.start.y+" ex="+temp.end.x+" ey="+temp.end.y);
+                    Log.i(tag, "sx="+temp.start.x+"sy="+temp.start.y+"ex="+temp.end.x+"ey="+temp.end.y);
                     drawROI(canvas, temp.start, temp.end, paint);
                 }else if(temp.type == setStep.BANNER){
-                    Log.i(tag, "sx="+temp.start.x+" sy="+temp.start.y+" ex="+temp.end.x+" ey="+temp.end.y);
+                    Log.i(tag, "sx="+temp.start.x+"sy="+temp.start.y+"ex="+temp.end.x+"ey="+temp.end.y);
                     drawBanner(canvas, temp.start, temp.end, paint);
                 }else if(temp.type == setStep.TARGET){
-                    Log.i(tag, "sx="+temp.start.x+" sy="+temp.start.y+" ex="+temp.end.x+" ey="+temp.end.y);
+                    Log.i(tag, "sx="+temp.start.x+"sy="+temp.start.y+"ex="+temp.end.x+"ey="+temp.end.y);
                     drawTarget(canvas, temp.start, temp.end, paint);
                 }
             }
@@ -420,8 +392,8 @@ public class CameraPreviewActivity extends ActionBarActivity {
             Paint paint = new Paint();
             // clear canvasDrawingPane
             canvas = drawHolder.lockCanvas();
-            end.x = projectedX;
-            end.y = projectedY;
+            end.x = x;
+            end.y = y;
             canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
 
             if(settingStatus == setStep.ROI) {
@@ -434,15 +406,17 @@ public class CameraPreviewActivity extends ActionBarActivity {
             if(canvas != null)
                 drawHolder.unlockCanvasAndPost(canvas);
 
-            endPt.x = projectedX;
-            endPt.y = projectedY;
+            endPt.x = x;
+            endPt.y = y;
+            oriEndPt.x = projectedX;
+            oriEndPt.y = projectedY;
         }
     }
 
     private void finalizeDrawing(){
         okButton.setVisibility(View.VISIBLE);
         resetButton.setVisibility(View.VISIBLE);
-        if(settingStatus >= setStep.TARGET){
+        if(settingStatus >= setStep.BANNER){
             doneButton.setVisibility(View.VISIBLE);
         }
     }
@@ -463,16 +437,20 @@ public class CameraPreviewActivity extends ActionBarActivity {
             switch (action) {
                 case MotionEvent.ACTION_DOWN:
                     debugText.setText("ACTION_DOWN (" + x + " , " + y + ")");
-                    startPt = projectXY(bitmapView, resizeBitmap, x, y);
+                    startPt = new projectPt();
+                    startPt.x = x;
+                    startPt.y = y;
+                    oriStartPt = projectXY(bitmapView, originBitmap, x, y);
                     endPt = new projectPt();
+                    oriEndPt = new projectPt();
                     break;
                 case MotionEvent.ACTION_MOVE:
                     debugText.setText("ACTION_MOVE (" + x + " , " + y + ")");
-                    drawOnRectProjectedBitMap(bitmapView, resizeBitmap, x, y);
+                    drawOnRectProjectedBitMap(bitmapView, originBitmap, x, y);
                     break;
                 case MotionEvent.ACTION_UP:
                     debugText.setText("ACTION_UP (" + x + " , " + y + ")");
-                    drawOnRectProjectedBitMap(bitmapView, resizeBitmap, x, y);
+                    drawOnRectProjectedBitMap(bitmapView, originBitmap, x, y);
                     finalizeDrawing();
                     break;
             }
@@ -481,40 +459,42 @@ public class CameraPreviewActivity extends ActionBarActivity {
     }
 
     private void handleButton(){
-        if(captureButton == null)
-            Log.e(tag, "captureButton = Null");
-        else {
+        if(captureButton == null){
+            Log.i(tag, "CameraPreviewActivity:captureButton = Null");
+        }else {
             captureButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View arg0) {
                     Canvas canvas = null;
-                    Log.i(tag, "capture image!");
-                    originBitmap = camPreview.captureImage();
+                    Log.i(tag, "CameraPreviewActivity:capture image!");
+                    try{
+                        originBitmap = camPreview.captureImage();
+                        if(gDispWidth != originBitmap.getWidth() || gDispHeight != originBitmap.getHeight()) {
+                            scaleBitmap = Bitmap.createScaledBitmap(originBitmap, gDispWidth, gDispHeight, false);
+                        }else{
+                            scaleBitmap = originBitmap;
+                        }
 
-
-                    float scaleWidth = screenWidth / (float) originBitmap.getWidth();
-                    float scaleHeight = screenHeight / (float) originBitmap.getHeight();
-                    Log.i("Alex", "SettingManager====> set scale value : " + scaleWidth + ":" + scaleHeight);
-                    Matrix matrix = new Matrix();
-                    matrix.postScale(scaleWidth, scaleHeight);
-                    resizeBitmap = Bitmap.createBitmap(originBitmap, 0, 0, originBitmap.getWidth(), originBitmap.getHeight(), matrix, true);
-
-
-                    try {
-                        Rect dest = new Rect(0, 0, resizeBitmap.getWidth(), resizeBitmap.getHeight());
-                        Paint paint = new Paint();
-                        paint.setFilterBitmap(true);
-                        canvas = bitmapHolder.lockCanvas();
-                        canvas.drawBitmap(resizeBitmap, null, dest, paint);
-                        Log.i(tag, "width = " + resizeBitmap.getWidth() + "height = " + resizeBitmap.getHeight());
+                        if(scaleBitmap != null) {
+                            Rect dest = new Rect(0, 0, scaleBitmap.getWidth(), scaleBitmap.getHeight());
+                            Paint paint = new Paint();
+                            paint.setFilterBitmap(true);
+                            canvas = bitmapHolder.lockCanvas();
+                            canvas.drawBitmap(scaleBitmap, null, dest, paint);
+                            Log.i(tag, "CameraPreviewActivity:scaleBitmap width = " + scaleBitmap.getWidth() + "height = " + scaleBitmap.getHeight());
+                        }else{
+                            Log.i(tag, "CameraPreviewActivity: capture image to bitmap failed");
+                        }
                         captureButton.setVisibility(View.INVISIBLE);
                         okButton.setVisibility(View.VISIBLE);
                         resetButton.setVisibility(View.VISIBLE);
-                    } catch (Exception E) {
-                    } finally {
+                    }catch (Exception E){
+                        Log.i(tag, E.toString());
+                    }finally{
                         if (canvas != null)
                             bitmapHolder.unlockCanvasAndPost(canvas);
                     }
+
                 }
             });
         }
@@ -526,7 +506,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
                 @Override
                 public void onClick(View arg0) {
                     if(settingStatus == setStep.BEGIN) {
-                        Log.i(tag, "ok!");
+                        Log.i(tag, "CameraPreviewActivity: capture ok!");
                         captureButton.setVisibility(View.INVISIBLE);
                         okButton.setVisibility(View.INVISIBLE);
                         resetButton.setVisibility(View.INVISIBLE);
@@ -539,7 +519,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
                         Canvas canvas = null;
                         Paint paint = new Paint();
                         canvas = bufferHolder.lockCanvas();
-                        drawHistory temp = new drawHistory(setStep.ROI, startPt, endPt);
+                        drawHistory temp = new drawHistory(setStep.ROI, startPt, endPt, oriStartPt, oriEndPt);
                         drawList.add(temp);
                         drawSettingList(drawList, canvas, paint);
                         if(canvas != null)
@@ -552,7 +532,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
                         Canvas canvas = null;
                         Paint paint = new Paint();
                         canvas = bufferHolder.lockCanvas();
-                        drawHistory temp = new drawHistory(setStep.BANNER, startPt, endPt);
+                        drawHistory temp = new drawHistory(setStep.BANNER, startPt, endPt, oriStartPt, oriEndPt);
                         drawList.add(temp);
                         drawSettingList(drawList, canvas, paint);
                         if(canvas != null)
@@ -565,7 +545,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
                         Canvas canvas = null;
                         Paint paint = new Paint();
                         canvas = bufferHolder.lockCanvas();
-                        drawHistory temp = new drawHistory(setStep.TARGET, startPt, endPt);
+                        drawHistory temp = new drawHistory(setStep.TARGET, startPt, endPt, oriStartPt, oriEndPt);
                         drawList.add(temp);
                         drawSettingList(drawList, canvas, paint);
                         if(canvas != null)
@@ -627,12 +607,121 @@ public class CameraPreviewActivity extends ActionBarActivity {
                 @Override
                 public void onClick(View arg0) {
                     Log.i(tag, "Done transfer data to the server");
+                    if(settingStatus >= setStep.BANNER){
+                        Log.i(tag, "setting target ok!(done)");
+                        Canvas canvas = null;
+                        Paint paint = new Paint();
+                        canvas = bufferHolder.lockCanvas();
+                        drawHistory temp = new drawHistory(settingStatus, startPt, endPt, oriStartPt, oriEndPt);
+                        drawList.add(temp);
+                        drawSettingList(drawList, canvas, paint);
+                        if(canvas != null)
+                            bufferHolder.unlockCanvasAndPost(canvas);
+                        okButton.setVisibility(View.INVISIBLE);
+                        resetButton.setVisibility(View.INVISIBLE);
+                        doneButton.setVisibility(View.INVISIBLE);
+                        settingStatus++;
+                    }
                     transferDKDK();
+                    //known issue, if you press done after send to server...won't fix due to must go to jni process
+
                 }
             });
         }
     }
 
+    private ByteArrayOutputStream convertBMP(Bitmap jpeg)
+    {
+
+        int WIDTH = jpeg.getWidth();
+        int HEIGHT = jpeg.getHeight();
+        int PADDING = (4-WIDTH*3%4)%4;
+        int IMG_SIZE = (WIDTH*3+PADDING)*HEIGHT;
+
+        short header[] = {
+                0x4d42,
+                (short)((IMG_SIZE+54)<<16>>16),(short)((IMG_SIZE+54)>>16),
+                0,0,
+                0x0036,0,
+                0x0028,0,
+                (short)(WIDTH<<16>>16),(short)(WIDTH>>16),
+                (short)(HEIGHT<<16>>16),(short)(HEIGHT>>16),
+                1,
+                0x18,
+                0,0,
+                (short)(IMG_SIZE<<16>>16),(short)(IMG_SIZE>>16),
+                0,0,
+                0,0,
+                0,0,
+                0,0
+        };
+
+        int i,j;
+        byte pad[] = new byte[3];		// padding
+        byte pixel[] = new byte[3];			// B G R
+        pad[0]=0;
+        pad[1]=0;
+        pad[2]=0;
+        ByteArrayOutputStream mp;
+        try {
+            //mp = fopen("bmp.bmp","wb");
+            //FileOutputStream mp = new FileOutputStream(Environment.getExternalStorageDirectory()+"/DK.bmp");
+            mp = new ByteArrayOutputStream();
+
+            //fwrite(header, 2, sizeof(header) / 2, mp);
+            for(i=0;i<header.length;i++) {
+                mp.write((byte) (header[i] & 0xff));        // low byte
+                mp.write((byte) (header[i]>>8 & 0xff));     // high byte
+            }
+
+            int[] data = new int[WIDTH * HEIGHT];
+            jpeg.getPixels(data, 0, WIDTH, 0, 0, WIDTH, HEIGHT);
+
+            for (i = 0; i < HEIGHT; ++i)
+            {
+                for (j = 0; j < WIDTH; ++j)
+                {
+                    int index = (HEIGHT-i-1) * WIDTH + j;   // *Up Down Reverse to get correct BMP
+                    byte r = (byte)((data[index] >> 16) & 0xff);
+                    byte g = (byte)((data[index] >> 8) & 0xff);
+                    byte b = (byte)(data[index] & 0xff);
+
+                    pixel[2] = r;   // R
+                    pixel[1] = g; 	// G
+                    pixel[0] = b; 	// B
+
+                    //fwrite(pixel,1,3,mp);
+                    mp.write(pixel);
+                }
+                //fwrite(&pad,1,PADDING,mp);		// 填充成 DWORD = 4byte
+                mp.write(pad,1,PADDING);
+            }
+                //fclose(mp);
+                mp.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        return mp;
+    }
+
+
+    private drawHistory fixROI(drawHistory pt)
+    {
+        int temp;
+        if(pt.oriStart.x > pt.oriEnd.x) {
+            temp = pt.oriStart.x;
+            pt.oriStart.x = pt.oriEnd.x;
+            pt.oriEnd.x = temp;
+        }
+        if(pt.oriStart.y > pt.oriEnd.y) {
+            temp = pt.oriStart.y;
+            pt.oriStart.y = pt.oriEnd.y;
+            pt.oriEnd.y = temp;
+        }
+        return pt;
+    }
 
     private boolean transferDKDK()
     {
@@ -643,8 +732,13 @@ public class CameraPreviewActivity extends ActionBarActivity {
         Log.i(tag,"upload picture and training data!");
         if(originBitmap == null)
             return false;
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        originBitmap.compress(Bitmap.CompressFormat.JPEG , 60 , stream);
+        //ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        //originBitmap.compress(Bitmap.CompressFormat.JPEG , 60 , stream);
+
+        Log.i(tag, "forming bmp ... ");
+        ByteArrayOutputStream stream = convertBMP(originBitmap);
+        Log.i(tag, "forming bmp ... finished! ");
+
         byte [] data = stream.toByteArray();
         List<NameValuePair> post = new ArrayList<NameValuePair>();
 
@@ -657,21 +751,24 @@ public class CameraPreviewActivity extends ActionBarActivity {
         post.add(new BasicNameValuePair("TagNum", Integer.toString(numRoi-1)));
 
         tempRoi = drawList.get(0);
-        tempRoi = projectROI(resizeBitmap,originBitmap,tempRoi); // resize => origin
-        post.add(new BasicNameValuePair("ROI_X", Integer.toString(tempRoi.start.x)));
-        post.add(new BasicNameValuePair("ROI_Y", Integer.toString(tempRoi.start.y)));
-        post.add(new BasicNameValuePair("ROI_W", Integer.toString(tempRoi.start.x-tempRoi.end.x))); //abs?
-        post.add(new BasicNameValuePair("ROI_H", Integer.toString(tempRoi.start.y-tempRoi.end.y)));
-        Log.i(tag, "ROI: name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
+        tempRoi = fixROI(tempRoi);
+
+        post.add(new BasicNameValuePair("ROI_X", Integer.toString(tempRoi.oriStart.x)));
+        post.add(new BasicNameValuePair("ROI_Y", Integer.toString(tempRoi.oriStart.y)));
+        post.add(new BasicNameValuePair("ROI_W", Integer.toString(tempRoi.oriEnd.x-tempRoi.oriStart.x))); //abs?
+        post.add(new BasicNameValuePair("ROI_H", Integer.toString(tempRoi.oriEnd.y-tempRoi.oriStart.y)));
+        //Log.i(tag, "ROI: name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
+        Log.i(tag, "ROI: name:" + tempRoi.type + " X:" + tempRoi.oriStart.x + " Y:" + tempRoi.oriStart.y + " W:" + Integer.toString(tempRoi.oriEnd.x-tempRoi.oriStart.x) + " H:" + Integer.toString(tempRoi.oriEnd.y-tempRoi.oriStart.y));
         for(int i=1; i<=numRoi-1; i++) {
             tempRoi = drawList.get(i);
-            tempRoi = projectROI(resizeBitmap, originBitmap, tempRoi); // resize => origin
+            tempRoi = fixROI(tempRoi);
             post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_T", " "));  // Tag Type
-            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_X", Integer.toString(tempRoi.start.x)));
-            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_Y", Integer.toString(tempRoi.start.y)));
-            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_W", Integer.toString(tempRoi.start.x-tempRoi.end.x)));
-            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_H", Integer.toString(tempRoi.start.y-tempRoi.end.y)));
-            Log.i(tag, "TAG:" + i + " name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
+            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_X", Integer.toString(tempRoi.oriStart.x)));
+            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_Y", Integer.toString(tempRoi.oriStart.y)));
+            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_W", Integer.toString(tempRoi.oriEnd.x-tempRoi.oriStart.x)));
+            post.add(new BasicNameValuePair("TAG"+Integer.toString(i)+"_H", Integer.toString(tempRoi.oriEnd.y-tempRoi.oriStart.y)));
+            //Log.i(tag, "TAG:" + i + " name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
+            Log.i(tag, "TAG:" + i + " name:" + tempRoi.type + " X:" + tempRoi.oriStart.x + " Y:" + tempRoi.oriStart.y + " W:" + Integer.toString(tempRoi.oriEnd.x-tempRoi.oriStart.x) + " H:" + Integer.toString(tempRoi.oriEnd.y-tempRoi.oriStart.y));
         }
         post.add(new BasicNameValuePair("NUM", Integer.toString(save_num)));
         httpControl.httpHandleCmd(httpControl.url_upload, post,new ServerDone() {
@@ -681,7 +778,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
 
                 Log.i(tag, str);
                 frameLayout.removeView(progressBar);
-                if(str.equals("Upload Success!") && httpControl.saves<3) {
+                if(str.substring(str.length()-15).equals("Upload Success!") && httpControl.saves<3) {
                     httpControl.saves += 1; // == save_num
                     Toast.makeText(getBaseContext(), "Saving to #"+save_num, Toast.LENGTH_LONG).show();
                 }
@@ -691,14 +788,13 @@ public class CameraPreviewActivity extends ActionBarActivity {
             }
         });
 
-        if(resizeBitmap != null)
-            resizeBitmap.recycle();
+        if(scaleBitmap != null)
+            scaleBitmap.recycle();
 
         if(originBitmap != null)
             originBitmap.recycle();
 
         return true;
     }
-
 
 }
