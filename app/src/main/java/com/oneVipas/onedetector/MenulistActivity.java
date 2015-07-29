@@ -18,6 +18,7 @@ import android.widget.Button;
 public class MenulistActivity extends ActionBarActivity {
 	private String tag = "oneDetector";
 	private Button oldButton, newButton;
+	private int choose_record;
 
 
 	@Override
@@ -32,6 +33,8 @@ public class MenulistActivity extends ActionBarActivity {
         //getWindowManager().getDefaultDisplay().getMetrics(metrics);
 
 		handleButton();
+
+		choose_record = 0;
 	}
     @Override
     protected void onResume() {
@@ -94,16 +97,25 @@ public class MenulistActivity extends ActionBarActivity {
 	
 	private void goExistingRecord(){
 		Intent it = new Intent(this, ExistingRecordActivity.class);
-		it.putExtra("xxx", "xxx");
+		it.putExtra("choose", choose_record);
+		choose_record = 0;
+		Log.i(tag, "startActivity ExistingRecordActivity");
 		startActivity(it);
 	}
 
     private void goCamera(){
         Intent it = new Intent(this, CameraPreviewActivity.class);
         it.putExtra("newTraining", "goCamera");
-        startActivity(it);
+        startActivityForResult(it, 2);
     }
 
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data)
+	{
+		super.onActivityResult(requestCode, resultCode, data);
+		Log.d(tag, "requset = " + requestCode + "   result = " + resultCode);
+		choose_record = resultCode;
+	}
 
 	@Override
 	public void onPause() {

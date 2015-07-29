@@ -280,7 +280,8 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
                     paint.setXfermode(new PorterDuffXfermode(Mode.SRC));
 
                     paint.setColor(Color.RED);
-                    paint.setStrokeWidth(2);
+
+                    paint.setStrokeWidth(10);
                     paint.setStyle(Paint.Style.STROKE);
 
                     //Log.i(tag, "Runnable gPreviewSize = " + gPreviewWidth + " * " + gPreviewHeight);
@@ -292,6 +293,11 @@ public class CameraPreview implements SurfaceHolder.Callback, Camera.PreviewCall
                     rectClass.height = (int)(rectClass.height*scaley);
 
                     canvas.drawRect(rectClass.x, rectClass.y, (rectClass.x + rectClass.width) - 1, (rectClass.y + rectClass.height) - 1, paint);
+
+
+                    paint.setStrokeWidth(3);
+                    paint.setTextSize(45);
+                    canvas.drawText("tag = " + resultData[0],50,50,paint);
 
                 } catch (Exception e) {
                     e.printStackTrace();

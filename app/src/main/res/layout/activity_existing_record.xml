@@ -1,38 +1,80 @@
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:paddingBottom="@dimen/activity_vertical_margin"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+             android:paddingBottom="@dimen/activity_vertical_margin"
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
-    tools:context="com.oneVipas.onedetector.ExistingRecordActivity" >
+    tools:context="com.oneVipas.onedetector.ExistingRecordActivity"
+    >
+    <TableLayout android:layout_width="fill_parent"
+                 android:layout_height="fill_parent"
+                 android:paddingBottom="@dimen/activity_vertical_margin"
+                 android:paddingLeft="@dimen/activity_horizontal_margin"
+                 android:paddingRight="@dimen/activity_horizontal_margin"
+                 android:paddingTop="@dimen/activity_vertical_margin"
+        >
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical|center_horizontal"
+            android:layout_weight="2"
+            >
 
-    <Button
-        android:id="@+id/button1"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="91dp"
-        android:text="record1" />
+            <Button
+                android:id="@+id/button1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="record1"
+                android:layout_above="@+id/button2"
+                android:layout_centerHorizontal="true"
+                android:layout_gravity="center_horizontal|bottom"/>
+        </TableRow>
 
-    <Button
-        android:id="@+id/button2"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/button1"
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="3"
+            android:gravity="center_vertical|center_horizontal">
+
+            <Button
+                android:id="@+id/button2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="record2"
+                android:layout_centerVertical="true"
+                android:layout_centerHorizontal="true"
+                android:layout_gravity="center"/>
+
+        </TableRow>
+
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical|center_horizontal"
+            android:layout_weight="2">
+
+            <Button
+                android:id="@+id/button3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="record3"
+                android:layout_below="@+id/button2"
+                android:layout_centerHorizontal="true"
+                android:layout_gravity="center_horizontal|top"/>
+        </TableRow>
+
+    </TableLayout>
+
+    <ProgressBar
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/progressBar2"
         android:layout_below="@+id/button1"
-        android:layout_marginTop="34dp"
-        android:text="record2" />
-
-    <Button
-        android:id="@+id/button3"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/button2"
-        android:layout_below="@+id/button2"
-        android:layout_marginTop="34dp"
-        android:text="record3" />
-
-</RelativeLayout>
+        android:layout_centerHorizontal="true"
+        android:visibility="invisible"
+        android:layout_gravity="center"
+        android:indeterminate="false"
+        android:layout_margin="80dp"/>
+</FrameLayout>

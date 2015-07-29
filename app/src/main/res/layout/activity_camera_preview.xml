@@ -3,6 +3,7 @@
     android:id="@+id/FrameLayout1"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
+    android:keepScreenOn="true"
     tools:context="com.oneVipas.onedetector.CameraPreviewActivity" >
 
     <Button
@@ -45,13 +46,22 @@
         android:layout_gravity="center_horizontal|bottom"
         android:visibility="invisible" />
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="Medium Text"
+        android:id="@+id/textView2"/>
+
     <ProgressBar
-        android:layout_width="87dp"
-        android:layout_height="87dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:id="@+id/progressBar"
         android:layout_below="@+id/button1"
         android:layout_centerHorizontal="true"
         android:visibility="visible"
-        android:layout_gravity="center" />
+        android:layout_gravity="center"
+        android:indeterminate="false"
+        android:layout_margin="80dp"/>
 
 </FrameLayout>

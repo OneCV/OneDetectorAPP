@@ -11,12 +11,10 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
-import android.graphics.Point;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.hardware.Camera;
 import android.os.Bundle;
-import android.os.Environment;
 import android.support.v7.app.ActionBarActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -31,8 +29,8 @@ import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.NumberPicker;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -41,9 +39,6 @@ import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -74,6 +69,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
     private ServerControl httpControl;
     private int save_num;
     private Bitmap originBitmap;
+    private boolean OnTouchAble = true;
 
     class projectPt {
         int x;
@@ -174,7 +170,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
                 previewWidth = previewSizes.get(i).width;
                 previewHeight = previewSizes.get(i).height;
                 Log.i("CV", "CameraPreviewSizes = " + previewWidth + "x" + previewHeight);
-                Toast.makeText(getBaseContext(), "CameraPreviewSizes = " + previewWidth + "x" + previewHeight, Toast.LENGTH_LONG).show();
+                //Toast.makeText(getBaseContext(), "CameraPreviewSizes = " + previewWidth + "x" + previewHeight, Toast.LENGTH_LONG).show();
                 break;
             }
         }
@@ -220,18 +216,14 @@ public class CameraPreviewActivity extends ActionBarActivity {
             View promptsView = li.inflate(R.layout.activity_prompts2, null);
             AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(CameraPreviewActivity.this);
             alertDialogBuilder.setView(promptsView);
-            final EditText userInput = (EditText)promptsView.findViewById(R.id.editTextDialogUserInput);
+            final NumberPicker userInput = (NumberPicker)promptsView.findViewById(R.id.userInput);
+            userInput.setMinValue(1);
+            userInput.setMaxValue(3);
+            userInput.setValue(1);
             alertDialogBuilder.setCancelable(false)
                     .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
-                            int idx = Integer.parseInt(userInput.getText().toString());
-                            if (idx >= 1 && idx <= 3)
-                                save_num = idx;
-                            else
-                            {
-                                Toast.makeText(getBaseContext(), "Must between 1~3", Toast.LENGTH_LONG).show();
-                                finish();
-                            }
+                            save_num = userInput.getValue();
                         }
                     })
                     .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
@@ -264,8 +256,8 @@ public class CameraPreviewActivity extends ActionBarActivity {
         drawView.setZOrderOnTop(true);
         drawHolder.setFormat(PixelFormat.TRANSPARENT);
 
-        frameLayout.addView(camView, new LayoutParams(screenWidth,screenHeight));
-        frameLayout.addView(bitmapView, new LayoutParams(screenWidth,screenHeight));
+        frameLayout.addView(camView, new LayoutParams(screenWidth, screenHeight));
+        frameLayout.addView(bitmapView, new LayoutParams(screenWidth, screenHeight));
         frameLayout.addView(bufferView, new LayoutParams(screenWidth, screenHeight));
         frameLayout.addView(drawView, new LayoutParams(screenWidth,screenHeight));  // previewWidth,previewHeight
 
@@ -279,6 +271,9 @@ public class CameraPreviewActivity extends ActionBarActivity {
         frameLayout.addView(doneButton);
         frameLayout.removeView(debugText);
         frameLayout.addView(debugText);
+        frameLayout.removeView(progressBar);
+        frameLayout.addView(progressBar);
+        progressBar.setVisibility(View.INVISIBLE);
     }
 
 	public void enableCameraPreview(byte[] JNI){
@@ -480,6 +475,8 @@ public class CameraPreviewActivity extends ActionBarActivity {
     }
 
     public boolean onTouchEvent(MotionEvent event){
+        if(!OnTouchAble)
+            return false;
         int action = event.getAction();
         int x = (int) event.getX();
         int y = (int) event.getY();
@@ -674,9 +671,8 @@ public class CameraPreviewActivity extends ActionBarActivity {
                         doneButton.setVisibility(View.INVISIBLE);
                         settingStatus++;
                     }
+                    OnTouchAble = false;
                     transferDKDK();
-                    //known issue, if you press done after send to server...won't fix due to must go to jni process
-
                 }
             });
         }
@@ -761,7 +757,8 @@ public class CameraPreviewActivity extends ActionBarActivity {
     {
         int numRoi;
         drawHistory tempRoi;
-        frameLayout.addView(progressBar);
+        //frameLayout.addView(progressBar);
+        progressBar.setVisibility(View.VISIBLE);
         // upload picture
         Log.i(tag,"upload picture and training data!");
         if(originBitmap == null)
@@ -781,18 +778,18 @@ public class CameraPreviewActivity extends ActionBarActivity {
         post.add(new BasicNameValuePair("Img_H", Integer.toString(originBitmap.getHeight())));
 
         numRoi = drawList.size();
-        Log.i(tag, "roi size ="+numRoi);
+        Log.i(tag, "roi size =" + numRoi);
         post.add(new BasicNameValuePair("TagNum", Integer.toString(numRoi-1)));
 
         tempRoi = drawList.get(0);
         tempRoi = fixROI(tempRoi);
-        tempRoi = projectROI(resizeBitmap,originBitmap,tempRoi); // resize => origin
+        tempRoi = projectROI(resizeBitmap, originBitmap, tempRoi); // resize => origin
         post.add(new BasicNameValuePair("ROI_X", Integer.toString(tempRoi.start.x)));
         post.add(new BasicNameValuePair("ROI_Y", Integer.toString(tempRoi.start.y)));
         post.add(new BasicNameValuePair("ROI_W", Integer.toString(tempRoi.end.x-tempRoi.start.x))); //abs?
         post.add(new BasicNameValuePair("ROI_H", Integer.toString(tempRoi.end.y-tempRoi.start.y)));
         //Log.i(tag, "ROI: name:" + tempRoi.type + " SX:" + tempRoi.start.x + " SY:" + tempRoi.start.y + " EX:" + tempRoi.end.x + " EY:" + tempRoi.end.y);
-        Log.i(tag, "ROI: name:" + tempRoi.type + " X:" + tempRoi.start.x + " Y:" + tempRoi.start.y + " W:" + Integer.toString(tempRoi.end.x-tempRoi.start.x) + " H:" + Integer.toString(tempRoi.end.y-tempRoi.start.y));
+        Log.i(tag, "ROI: name:" + tempRoi.type + " X:" + tempRoi.start.x + " Y:" + tempRoi.start.y + " W:" + Integer.toString(tempRoi.end.x - tempRoi.start.x) + " H:" + Integer.toString(tempRoi.end.y - tempRoi.start.y));
         for(int i=1; i<=numRoi-1; i++) {
             tempRoi = drawList.get(i);
             tempRoi = fixROI(tempRoi);
@@ -806,6 +803,7 @@ public class CameraPreviewActivity extends ActionBarActivity {
             Log.i(tag, "TAG:" + i + " name:" + tempRoi.type + " X:" + tempRoi.start.x + " Y:" + tempRoi.start.y + " W:" + Integer.toString(tempRoi.end.x-tempRoi.start.x) + " H:" + Integer.toString(tempRoi.end.y-tempRoi.start.y));
         }
         post.add(new BasicNameValuePair("NUM", Integer.toString(save_num)));
+
         httpControl.httpHandleCmd(httpControl.url_upload, post,new ServerDone() {
             @Override
             public void execute(byte[] result) {
@@ -813,9 +811,12 @@ public class CameraPreviewActivity extends ActionBarActivity {
 
                 Log.i(tag, str);
                 frameLayout.removeView(progressBar);
-                if(str.substring(str.length()-15).equals("Upload Success!") && httpControl.saves<3) {
-                    httpControl.saves += 1; // == save_num
-                    Toast.makeText(getBaseContext(), "Saving to #"+save_num, Toast.LENGTH_LONG).show();
+                if(str.substring(str.length()-15).equals("Upload Success!")) {
+                    if(httpControl.saves<3)
+                        httpControl.saves += 1; // == save_num
+                    Toast.makeText(getBaseContext(), "Saving to #" + save_num, Toast.LENGTH_LONG).show();
+                    Log.i(tag, "setting Result : " + save_num);
+                    setResult(save_num);
                 }
                 else
                     Toast.makeText(getBaseContext(), str, Toast.LENGTH_LONG).show();

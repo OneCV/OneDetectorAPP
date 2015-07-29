@@ -1,18 +1,16 @@
 package com.oneVipas.onedetector;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 
-import android.os.Environment;
 import android.support.v7.app.ActionBarActivity;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -20,27 +18,51 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 public class ExistingRecordActivity extends ActionBarActivity {
+    private String tag = "oneDetector";
+    private int choose_record;
 
-	private Button button1, button2, button3;
+    private Button button[];
     private ServerControl httpControl;
+
+    private Intent intent;
+    private ProgressBar progressbar;
 
     @Override
 	protected void onCreate(Bundle savedInstanceState) {
+        Log.i(tag, "ExistingRecordActivity onCreate");
 		super.onCreate(savedInstanceState);
 		getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-		requestWindowFeature(Window.FEATURE_NO_TITLE);	
+		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		setContentView(R.layout.activity_existing_record);
 		buttonHandler();
         httpControl = new ServerControl();
+
+        intent = getIntent();
+
+        progressbar = (ProgressBar) findViewById(R.id.progressBar2);
+
+        choose_record = intent.getIntExtra("choose",0);
+        Log.i(tag, "Choose " + choose_record);
 	}
+
+    @Override
+    protected void onStop()
+    {
+        super.onStop();
+        Log.i(tag, "ExistingRecordActivity onStop");
+        Log.i(tag, "Choose " + choose_record);
+    }
 
     @Override
     protected void onResume() {
         super.onResume();
+        Log.i(tag, "ExistingRecordActivity onResume");
+        Log.i(tag, "Choose " + choose_record);
         buttonHandler();
     }
 
@@ -62,45 +84,55 @@ public class ExistingRecordActivity extends ActionBarActivity {
 		}
 		return super.onOptionsItemSelected(item);
 	}
-	
-	public void buttonHandler() {
-		
-		button1 = (Button) findViewById(R.id.button1);
-		button2 = (Button) findViewById(R.id.button2);
-		button3 = (Button) findViewById(R.id.button3);
 
-		button1.setOnClickListener(new OnClickListener() {
-			@Override
-			public void onClick(View arg0) {
-                loadFile(1);
-			}
-		});
-        button2.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View arg0) {
-                loadFile(2);
+    public void buttonHandler() {
+        int i;
+        button = new Button[3];
+        button[0] = (Button) findViewById(R.id.button1);
+        button[1] = (Button) findViewById(R.id.button2);
+        button[2] = (Button) findViewById(R.id.button3);
+        for (i=0;i<ServerControl.saves;i++)
+        {
+            final int idx = i;
+            button[idx].setOnClickListener(new OnClickListener()
+            {
+                @Override
+                public void onClick(View arg0)
+                {
+                    if (choose_record != 0)
+                        button[choose_record - 1].setBackgroundResource(R.drawable.button_selector_original);
+                    loadFile(idx + 1);
+                }
+            });
+            if(choose_record != idx+1)
+            {
+                button[idx].setBackgroundResource(R.drawable.button_selector_original);
+                Log.i(tag, "Choose " + idx + " false");
             }
-        });
-        button3.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View arg0) {
-                loadFile(3);
+            else
+            {
+                button[idx].setBackgroundResource(R.drawable.button_selector_focused);
+                Log.i(tag, "Choose " + idx + " true");
             }
-        });
+        }
+        for (;i<3;i++)
+            button[i].setVisibility(View.INVISIBLE);
 
-        if(ServerControl.saves<3)
-            button3.setVisibility(View.INVISIBLE);
-        if(ServerControl.saves<2)
-            button2.setVisibility(View.INVISIBLE);
-	}
+    }
     private void loadFile(int selected)
     {
+        progressbar.setVisibility(View.VISIBLE);
+
+        intent.putExtra("choose",0);
+        choose_record = 0;
+
         List<NameValuePair> post = new ArrayList<NameValuePair>();
         post.add(new BasicNameValuePair("NUM",""+selected));
 
         httpControl.httpHandleCmd(httpControl.url_download, post, new ServerDone() {
             @Override
             public void execute(byte[] result) {
+                progressbar.setVisibility(View.INVISIBLE);
                 try {
                     // result is the DK001.dkdk.dk file streaming
 

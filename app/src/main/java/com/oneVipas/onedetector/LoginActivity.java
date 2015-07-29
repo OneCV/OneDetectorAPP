@@ -97,7 +97,7 @@ public class LoginActivity extends ActionBarActivity {
     		finish();
     	}
     	
-    	Toast.makeText(LoginActivity.this,"logged : " + b,Toast.LENGTH_LONG).show();
+    	// Toast.makeText(LoginActivity.this,"logged : " + b,Toast.LENGTH_LONG).show();
 	}
 	
 	
